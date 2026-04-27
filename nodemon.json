@@ -1,0 +1,12 @@
+{
+  "watch": ["src", "medusa-config.ts"],
+  "ext": "ts,js,json",
+  "ignore": [
+    "public/admin/**",
+    ".medusa/**",
+    "storefront/**",
+    "node_modules/**",
+    "build/**",
+    "dist/**"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "promotions": {
+    "fields": {
+      "allocationTooltip": "Her biri miktarı ürün başına sınırlar, Bir kez ise sepet genelinde sınırlar",
+      "taxInclusive": "Vergi Dahil",
+      "usageLimit": "Kullanım Limiti",
+      "usage": "Kullanım",
+      "conditions": {
+        "target-rules": {
+          "order": {
+            "title": "Promosyon hangi ürünlere uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan ürünlere uygulanacaktır."
+          },
+          "shipping_methods": {
+            "title": "Promosyon hangi kargo yöntemlerine uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan kargo yöntemlerine uygulanacaktır."
+          },
+          "items": {
+            "title": "Promosyon hangi ürünlere uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan ürünlere uygulanacaktır."
+          }
+        }
+      }
+    },
+    "form": {
+      "taxInclusive": {
+        "title": "Promosyon vergi dahil mi?",
+        "description": "Bu alanı etkinleştirirseniz promosyon vergilerden sonra uygulanır"
+      },
+      "allocation": {
+        "once": {
+          "title": "Bir kez",
+          "description": "Değeri sınırlı sayıda ürüne uygular"
+        }
+      },
+      "value": {
+        "invalid": "Geçersiz promosyon değeri"
+      },
+      "limit": {
+        "title": "Kullanım Limiti",
+        "description": "Bu promosyonun tüm siparişlerde kaç kez kullanılabileceğini belirleyin. Sınırsız kullanım için boş bırakın."
+      }
+    },
+    "templates": {
+      "amount_off_products": {
+        "title": "Ürün Bazlı Sabit İndirim",
+        "description": "Belirli ürünlerde veya ürün koleksiyonlarında sabit tutar (TL) indirimi uygular."
+      },
+      "amount_off_order": {
+        "title": "Sepet Toplamından Düş",
+        "description": "Müşterinin sepet toplamından sabit bir tutar (TL) indirimi uygular."
+      },
+      "percentage_off_product": {
+        "title": "Ürün Bazlı Yüzdelik İndirim",
+        "description": "Seçili ürünlerin fiyatları üzerinden yüzdelik (%) indirim uygular."
+      },
+      "percentage_off_order": {
+        "title": "Sepet Geneli Yüzdelik İndirim",
+        "description": "Müşterinin sepet toplamı üzerinden yüzdelik (%) indirim uygular."
+      },
+      "buy_get": {
+        "title": "X Al Y Öde (Hediyeli Ürün)",
+        "description": "Belirli bir üründen X adet alana, Y ürününü ücretsiz veya indirimli verir."
+      },
+      "shipping_discount": {
+        "title": "Ücretsiz Kargo",
+        "description": "Kargo ücretlerinde %100 indirim uygulayarak bedava kargo sağlar."
+      }
+    }
+  }
+}

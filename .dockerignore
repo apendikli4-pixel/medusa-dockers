@@ -1,0 +1,17 @@
+
+node_modules
+.git
+.env
+dist
+build
+.next
+.cache
+.medusa
+*.log
+*.sql
+*.zip
+*.tar.gz
+*.rar
+docs
+storefront
+

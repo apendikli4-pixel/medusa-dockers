@@ -1,0 +1,86 @@
+{
+  "orders": {
+    "drafts": "Taslaklar",
+    "draft_orders": "Sipariş Taslakları",
+    "draft": "Taslak"
+  },
+  "promotions": {
+    "fields": {
+      "allocationTooltip": "Her biri miktarı ürün başına sınırlar, Bir kez ise sepet genelinde sınırlar",
+      "taxInclusive": "Vergi Dahil",
+      "usageLimit": "Kullanım Limiti",
+      "usage": "Kullanım",
+      "conditions": {
+        "target-rules": {
+          "order": {
+            "title": "Promosyon hangi ürünlere uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan ürünlere uygulanacaktır."
+          },
+          "shipping_methods": {
+            "title": "Promosyon hangi kargo yöntemlerine uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan kargo yöntemlerine uygulanacaktır."
+          },
+          "items": {
+            "title": "Promosyon hangi ürünlere uygulanacak?",
+            "description": "Promosyon, aşağıdaki koşulları karşılayan ürünlere uygulanacaktır."
+          }
+        }
+      }
+    },
+    "form": {
+      "taxInclusive": {
+        "title": "Promosyon vergi dahil mi?",
+        "description": "Bu alanı etkinleştirirseniz promosyon vergilerden sonra uygulanır"
+      },
+      "allocation": {
+        "once": {
+          "title": "Bir kez",
+          "description": "Değeri sınırlı sayıda ürüne uygular"
+        }
+      },
+      "value": {
+        "invalid": "Geçersiz promosyon değeri"
+      },
+      "limit": {
+        "title": "Kullanım Limiti",
+        "description": "Bu promosyonun tüm siparişlerde kaç kez kullanılabileceğini belirleyin. Sınırsız kullanım için boş bırakın."
+      }
+    },
+    "templates": {
+      "amount_off_products": {
+        "title": "Ürün Bazlı Sabit İndirim",
+        "description": "Belirli ürünlerde veya ürün koleksiyonlarında sabit tutar indirimi uygular."
+      },
+      "amount_off_order": {
+        "title": "Sepet Toplamından Düş",
+        "description": "Sepet toplamından sabit bir tutar indirimi uygular."
+      },
+      "percentage_off_product": {
+        "title": "Ürün Bazlı Yüzdelik İndirim",
+        "description": "Seçili ürünlere yüzdelik indirim uygular."
+      },
+      "percentage_off_order": {
+        "title": "Sepet Geneli Yüzdelik İndirim",
+        "description": "Sepet toplamına yüzdelik indirim uygular."
+      },
+      "buy_get": {
+        "title": "X Al Y Kazan",
+        "description": "Belirli ürünlerden satın alındığında ek ürün avantajı sağlar."
+      },
+      "shipping_discount": {
+        "title": "Ücretsiz Kargo",
+        "description": "Kargo ücretine %100 indirim uygular."
+      }
+    }
+  },
+  "Drafts": "Taslaklar",
+  "drafts": "Taslaklar",
+  "Draft Orders": "Sipariş Taslakları",
+  "draft_orders": "Sipariş Taslakları",
+  "draft-orders": "Sipariş Taslakları",
+  "Refund Reasons": "İade Nedenleri",
+  "refund_reasons": "İade Nedenleri",
+  "No draft orders": "Taslak sipariş bulunamadı",
+  "Create Draft Order": "Taslak Sipariş Oluştur",
+  "Draft Order": "Sipariş Taslağı"
+}

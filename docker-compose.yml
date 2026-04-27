@@ -1,0 +1,136 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: medusa_postgres_v2
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medusa-store}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - medusa_network
+
+  # Redis
+  redis:
+    image: redis:alpine
+    container_name: medusa_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - medusa_network
+
+  # Meilisearch (Hybrid Search Engine)
+  meilisearch:
+    image: getmeili/meilisearch:v1.13
+    container_name: medusa_meilisearch
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - MEILI_NO_ANALYTICS=true
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    restart: unless-stopped
+    networks:
+      - medusa_network
+
+  # 1. MEDUSA SERVER (SOVEREIGN: API ONLY)
+  medusa-server:
+    build: .
+    container_name: medusa_server_core_v2
+    working_dir: /server
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    command: [ "/bin/sh", "./start.sh" ]
+    ports:
+      - "9000:9000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medusa-genesis
+      - REDIS_URL=redis://redis:6379
+      - MEDUSA_WORKER_MODE=server
+      - JWT_SECRET=${JWT_SECRET:-supersecret}
+      - COOKIE_SECRET=${COOKIE_SECRET:-supersecret}
+      - MEILISEARCH_HOST=http://meilisearch:7700
+      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - NODE_OPTIONS=--max-old-space-size=4096
+    env_file:
+      - .env
+    volumes:
+      - .:/server
+      - /server/node_modules
+    networks:
+      - medusa_network
+
+  # 2. MEDUSA WORKER (SOVEREIGN: WORKER ONLY)
+  medusa-worker:
+    build: .
+    container_name: medusa_worker_core_v2
+    working_dir: /server
+    restart: unless-stopped
+    depends_on:
+      - medusa-server
+      - postgres
+      - redis
+    command: [ "/bin/sh", "./start.sh" ]
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medusa-genesis
+      - REDIS_URL=redis://redis:6379
+      - MEDUSA_WORKER_MODE=worker
+      - JWT_SECRET=${JWT_SECRET:-supersecret}
+      - COOKIE_SECRET=${COOKIE_SECRET:-supersecret}
+      - MEILISEARCH_HOST=http://meilisearch:7700
+      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - NODE_OPTIONS=--max-old-space-size=4096
+    env_file:
+      - .env
+    volumes:
+      - .:/server
+      - /server/node_modules
+    networks:
+      - medusa_network
+
+  # 3. STOREFRONT
+  storefront:
+    build:
+      context: ./storefront
+      dockerfile: Dockerfile
+    container_name: medusa_storefront
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - MEDUSA_BACKEND_URL=http://medusa-server:9000
+      - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
+      - NEXT_PUBLIC_SEARCH_ENDPOINT=http://localhost:9000
+      - NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${PUBLISHABLE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MEILISEARCH_HOST=http://meilisearch:7700
+      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
+    volumes:
+      - ./storefront:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - medusa_network
+    depends_on:
+      - medusa-server
+
+volumes:
+  postgres_data:
+  meilisearch_data:
+
+networks:
+  medusa_network:
+    driver: bridge

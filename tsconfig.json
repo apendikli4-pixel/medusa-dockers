@@ -1,0 +1,42 @@
+{
+    "compilerOptions": {
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "target": "ESNext",
+        "lib": [
+            "ES2021",
+            "DOM"
+        ],
+        "sourceMap": true,
+        "outDir": "./dist",
+        "baseUrl": "./",
+        "rootDir": "./",
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "jsx": "react-jsx",
+        "strict": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "build",
+        "dist",
+        ".medusa",
+        "src/links_backup",
+        "src/scripts/archive"
+    ],
+    "ts-node": {
+        "transpileOnly": true,
+        "files": true,
+        "esm": false,
+        "require": [
+            "tsconfig-paths/register"
+        ]
+    }
+}

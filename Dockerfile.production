@@ -1,0 +1,70 @@
+# ================================================================
+# Dockerfile for Medusa v2 - Production-Ready Multi-Stage Build
+# ================================================================
+
+# ===================
+# Stage 1: Dependencies
+# ===================
+FROM node:20-slim AS deps
+
+WORKDIR /server
+
+# System dependencies for node-gyp
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# ===================
+# Stage 2: Builder
+# ===================
+FROM node:20-slim AS builder
+
+WORKDIR /server
+
+# Copy dependencies from deps stage
+COPY --from=deps /server/node_modules ./node_modules
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# ===================
+# Stage 3: Runner (Production)
+# ===================
+FROM node:20-slim AS runner
+
+WORKDIR /server
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built application
+COPY --from=builder /server/.medusa ./.medusa
+COPY --from=builder /server/node_modules ./node_modules
+COPY --from=builder /server/package.json ./package.json
+COPY --from=builder /server/medusa-config.ts ./medusa-config.ts
+COPY --from=builder /server/tsconfig.json ./tsconfig.json
+COPY --from=builder /server/start.sh ./start.sh
+
+# Copy source for dynamic loading (Medusa needs this)
+COPY --from=builder /server/src ./src
+
+# Ensure start script is executable
+RUN chmod +x start.sh
+
+# Expose Medusa port
+EXPOSE 9000
+
+# Start the application
+CMD ["./start.sh"]

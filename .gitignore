@@ -1,0 +1,49 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+dist/
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
+medusa_debug.log*
+server_logs*.txt
+diagnostic_output*.txt
+seed_output*.txt
+startup_error.txt
+.medusa_dev.log
+.medusa_start.log
+final_diagnostic*.log
+
+# misc
+.DS_Store
+*.pem
+.env
+.env.*
+!.env.template
+diagnostic_output*.txt
+final_check.txt
+final_verify_report*.txt
+final_success_verify.txt
+final_shipping_verify.txt
+shipping_diagnostic*.txt
+model_list.txt
+regions_list.txt
+services_list.txt
+startup_diagnostics.txt
+
+# Medusa
+.medusa/

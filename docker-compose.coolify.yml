@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medusa-genesis}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.13
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilisearch_data:/meili_data
+
+  medusa-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - meilisearch
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
+      REDIS_URL: redis://redis:6379
+      MEDUSA_WORKER_MODE: server
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      STORE_CORS: ${STORE_CORS}
+      ADMIN_CORS: ${ADMIN_CORS}
+      AUTH_CORS: ${AUTH_CORS}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      NODE_OPTIONS: --max-old-space-size=4096
+    ports:
+      - "9000:9000"
+
+  medusa-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - meilisearch
+      - medusa-server
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
+      REDIS_URL: redis://redis:6379
+      MEDUSA_WORKER_MODE: worker
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      NODE_OPTIONS: --max-old-space-size=4096
+
+  storefront:
+    build:
+      context: ./storefront
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    depends_on:
+      - medusa-server
+    environment:
+      NODE_ENV: production
+      MEDUSA_BACKEND_URL: http://medusa-server:9000
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL}
+      NEXT_PUBLIC_SEARCH_ENDPOINT: ${NEXT_PUBLIC_SEARCH_ENDPOINT}
+      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
+  meilisearch_data:
