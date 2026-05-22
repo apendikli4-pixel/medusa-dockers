@@ -1,8 +1,14 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
+import { minorToMajorFloor } from "../lib/money"
 
 /**
  * order-completed-loyalty.ts
  * Sipariş tamamlandığında müşteriye otomatik puan ver.
+ *
+ * Para hesaplaması: order.total Medusa V2'de BigNumber (kuruş cinsinden).
+ * `lib/money.minorToMajorFloor` BigNumber-safe şekilde TL'ye çevirir —
+ * raw JS division (`/ 100`) presizyon kaybedebilir, bu yüzden helper
+ * kullanılır. Detay: src/lib/money.ts içindeki yorum bloku.
  */
 export default async function orderCompletedLoyaltySubscriber({
     event,
@@ -27,11 +33,11 @@ export default async function orderCompletedLoyaltySubscriber({
             return
         }
 
-        // Total is in smallest unit (kuruş/cents) → convert to TL
-        const totalTL = Math.floor((order.total || 0) / 100)
+        // BigNumber-safe kuruş → TL dönüşümü (kuruş kısmı puan kazanmaz)
+        const totalTL = minorToMajorFloor(order.total)
         const earned = await loyaltyService.awardOrderPoints(order.customer_id, orderId, totalTL)
 
-        logger.info(`[Loyalty] Customer ${order.customer_id} earned ${earned} points for order ${orderId}`)
+        logger.info(`[Loyalty] Customer ${order.customer_id} earned ${earned} points for order ${orderId} (total: ${totalTL} TL)`)
     } catch (e: any) {
         logger.error(`[Loyalty Subscriber] Error: ${e.message}`)
     }

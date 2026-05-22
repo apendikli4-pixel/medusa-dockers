@@ -8,6 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import crypto from "crypto"
 import { getClientIp } from "../../utils/get-client-ip"
+import { isValidAmount, roundToMinor } from "../../lib/money"
 import {
     Logger,
     ProviderWebhookPayload,
@@ -110,12 +111,14 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
             const user_phone = customer.phone || "05555555555"
             const user_email = customer.email || "no-reply@store.com"
 
-            // Medusa amounts are already expected in minor units (e.g. kurus).
-            const normalizedAmount = Number(amount)
-            if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+            // Medusa amounts are BigNumberInput (kuruş cinsinden minor unit).
+            // BigNumber-safe yardımcı: implicit coercion (Number(BigNumber))
+            // büyük sayılarda yanlış sonuç verebilir; lib/money tutarı önce
+            // BigNumber olarak normalize edip sonra integer'a yuvarlar.
+            if (!isValidAmount(amount)) {
                 throw new Error("PayTR: Invalid payment amount")
             }
-            const payment_amount = Math.round(normalizedAmount)
+            const payment_amount = roundToMinor(amount)
 
             // Build simple basket
             const user_basket = Buffer.from(JSON.stringify([

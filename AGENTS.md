@@ -178,6 +178,63 @@ storefront/src/
 - **HTTP method semantics** — Routes that mutate state (create, update, delete) must use `POST`/`PUT`/`DELETE`. Never use `GET` for write operations. (enforced 2026-03-24)
 
 
+## Medusa V2.15 Upgrade Path (planned)
+
+We currently target `@medusajs/*` v2.13.4 across the backend. The upgrade window is v2.13.4 → **v2.15.2** (NOT v2.13.5/v2.13.6/v2.14.x/v2.15.0/v2.15.1).
+
+Why jump directly to v2.15.2:
+- v2.13.6 introduced a MikroORM regression where `medusa db:migrate` then `medusa db:generate` would generate "drop all tables" migrations for custom modules. v2.15.2 is the official fix.
+- v2.15.0 and v2.15.1 are missing PRs / superseded — Medusa team explicitly recommends v2.15.1+ (we go to .2 since it's the safe fix).
+
+Breaking changes to apply during upgrade:
+
+1. **Zod codemod (automatic)**: run `npx medusa codemod replace-zod-imports` once after `npm install`. Converts `import { z } from "zod"` → `import { z } from "@medusajs/framework/zod"` in all 22 zod-using files.
+2. **Zod v3 → v4 manual fixes** (codemod does NOT handle):
+   - `z.string().email()` → `z.email()` (top-level)
+   - `z.string().uuid()` → `z.uuid()`
+   - `z.string().url()` → `z.url()`
+   - `z.object().strict()` → `z.strictObject({...})`
+   - `z.object().passthrough()` → `z.looseObject({...})`
+   - `z.record(ValueSchema)` → `z.record(z.string(), ValueSchema)` (explicit key required)
+   - `z.string({ invalid_type_error: "..." })` → unified error function param
+3. **Product dimension fields**: `width`/`length`/`height`/`weight` are now `float` on both Product and ProductVariant. Previously: text on Product, number on ProductVariant. Check `src/modules/ayna/tools/volume-calculator-tool.ts` and any code that does arithmetic on these fields.
+4. **HTTP types alignment**: types exported from `@medusajs/framework/types` now match Zod schemas exactly. Some properties became required (e.g. `AdminCreatePricePreference.attribute`/`value`). `metadata` is now `Record<string, unknown> | null`, not `Record<string, any>`.
+5. **Official Loyalty Plugin** (`@medusajs/loyalty-plugin`) is now open-source. It provides **gift cards + store credit accounts only** — no point-per-purchase earning. Our `src/modules/loyalty` (1 TL = 1 point, 500 points = 50 TL discount) is COMPLEMENTARY. **Do not replace** our module — install the plugin alongside for gift cards if we add that feature later.
+
+Upgrade procedure (Faz 1):
+```bash
+npm install @medusajs/framework@2.15.2 @medusajs/medusa@2.15.2 \
+  @medusajs/admin-sdk@2.15.2 @medusajs/cli@2.15.2 \
+  @medusajs/fulfillment@2.15.2 @medusajs/fulfillment-manual@2.15.2 \
+  @medusajs/payment@2.15.2 @medusajs/promotion@2.15.2 \
+  @medusajs/types@2.15.2 @medusajs/utils@2.15.2 \
+  @medusajs/workflows-sdk@2.15.2
+npm install zod@^4.2.0
+npx medusa codemod replace-zod-imports
+npx tsc --noEmit            # find manual Zod v4 fixes needed
+npm run build               # full compilation
+npm test                    # all preservation tests must stay green
+npx medusa db:migrate       # apply v2.15 schema updates
+```
+
+## Financial Math Helpers (src/lib/money.ts)
+
+Medusa V2 entity money fields (`order.total`, `line_item.unit_price`, `tax_total`, etc.) are `BigNumber` / `BigNumberInput`. Raw JS arithmetic (`Number(x)`, `x / 100`, `Math.floor(x * rate)`) loses precision on large values and violates the "BigNumber for finance" rule.
+
+Always use the helpers in `src/lib/money.ts`:
+- `toBig(input)` → BigNumber instance, defensive (null/undefined → BigNumber(0))
+- `toNumber(input)` → safe JS number (BigNumber-aware coercion)
+- `minorToMajorFloor(input, divisor=100)` → kuruş → TL integer (used by loyalty subscriber)
+- `roundToMinor(input)` → for payment gateways needing integer kuruş (PayTR, İyzico)
+- `isValidAmount(input)` → positive finite check, returns boolean (no throw)
+
+Forbidden patterns:
+- ❌ `Number(order.total)` — use `toNumber(order.total)`
+- ❌ `(order.total || 0) / 100` — use `minorToMajorFloor(order.total)`
+- ❌ `Math.round(amount)` on a BigNumber — use `roundToMinor(amount)`
+- ❌ Inline BigNumber.js imports — go through `lib/money.ts` so all money math has one audit point
+
+
 ## Auth
 
 - All `/admin/*` routes require `authenticate("admin", ["bearer", "session"])`.
