@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 
-export async function GET(
+export async function POST(
     req: MedusaRequest,
     res: MedusaResponse
 ) {
@@ -11,7 +11,7 @@ export async function GET(
         logger.info("Triggering Brevo test via API route...")
 
         const result = await notificationModuleService.createNotifications({
-            to: process.env.BREVO_FROM_EMAIL || "test@aquahavuz.com",
+            to: process.env.BREVO_FROM_EMAIL || "test@store.com",
             channel: "email",
             template: "test-template-id",
             data: {
@@ -29,7 +29,7 @@ export async function GET(
         logger.error("API test notification failed: " + e.message)
         return res.status(500).json({
             success: false,
-            error: e.message
+            error: "Notification trigger failed. Check server logs."
         })
     }
 }

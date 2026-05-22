@@ -78,6 +78,44 @@ export default async function orderPlacedHandler({
                     order: fullOrder,
                 },
             });
+
+            // ─── TENANT BAĞLAMA: Siparişi ürünün ait olduğu mağazaya bağla ───
+            // İlk ürünün tenant bağlantısını bul ve siparişi aynı tenant'a ata
+            try {
+                const firstProductId = fullOrder.items?.[0]?.product_id
+                if (firstProductId) {
+                    // Ürünün bağlı olduğu tenant'ı bul
+                    const { data: productLinks } = await query({
+                        entity: "product",
+                        fields: ["tenant.tenant_id"],
+                        filters: { id: firstProductId },
+                    })
+
+                    const tenantId = productLinks?.[0]?.tenant?.tenant_id
+                    if (tenantId) {
+                        const { linkOrderToTenantWorkflow } = await import(
+                            "../workflows/link-entity-to-tenant"
+                        )
+                        await linkOrderToTenantWorkflow(container).run({
+                            input: {
+                                tenant_id: tenantId,
+                                order_id: data.id,
+                            },
+                        })
+                        const logger: any = container.resolve("logger")
+                        logger.info(
+                            `[Order→Tenant] Sipariş ${data.id} → Tenant ${tenantId} otomatik bağlandı.`
+                        )
+                    }
+                }
+            } catch (tenantError) {
+                const logger: any = container.resolve("logger")
+                logger.warn(
+                    `[Order→Tenant] Sipariş tenant bağlama başarısız (order: ${data.id}): ` +
+                    `${tenantError instanceof Error ? tenantError.message : "Bilinmeyen"}`
+                )
+                // Fail-open: Tenant bağlama hatası sipariş işlemini engellemez
+            }
         }
     } catch (error) {
         console.warn("Failed to trigger analytics workflow:", error);

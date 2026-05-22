@@ -28,6 +28,8 @@ export const POST = async (
 
         return res.json({ message: "Admin user already exists.", existingUser: users[0] })
     } catch (error: any) {
-        return res.json({ message: "Setup failed", error: error.message })
+        const logger = req.scope.resolve("logger") as any
+        logger.error(`[Admin Setup] Error: ${error.message}`)
+        return res.status(500).json({ message: "Setup failed. Check server logs." })
     }
 }

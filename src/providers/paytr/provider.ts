@@ -44,11 +44,13 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
     static identifier = "paytr"
     protected logger_: Logger
     protected options_: PayTROptions
+    protected container_: any
 
     constructor(container: any, options: PayTROptions) {
         super(container, options)
         this.logger_ = container.logger
         this.options_ = options
+        this.container_ = container
     }
 
     async initiatePayment(input: InitiatePaymentInput): Promise<InitiatePaymentOutput> {
@@ -57,8 +59,37 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
 
         this.logger_.info(`PayTR: Initiating payment for amount: ${amount} ${currency_code}`)
 
+        // ─── DİNAMİK TENANT CREDENTIALS (SaaS İzolasyonu) ───
+        let activeMerchantId = this.options_.merchant_id
+        let activeMerchantKey = this.options_.merchant_key
+        let activeMerchantSalt = this.options_.merchant_salt
+
+        try {
+            // Context'te sales_channel_id veya cart_id üzerinden Tenant bulunabilir
+            const salesChannelId = (context as any).sales_channel_id || (context as any).cart?.sales_channel_id
+            
+            if (salesChannelId && this.container_) {
+                const remoteQuery = this.container_.resolve("remoteQuery")
+                const { data } = await remoteQuery.graph({
+                    entity: "tenant",
+                    fields: ["settings"],
+                    filters: { sales_channel: { id: salesChannelId } }
+                })
+                
+                const tenantSettings = data[0]?.settings
+                if (tenantSettings?.paytr?.merchant_id && tenantSettings?.paytr?.merchant_key) {
+                    activeMerchantId = tenantSettings.paytr.merchant_id
+                    activeMerchantKey = tenantSettings.paytr.merchant_key
+                    activeMerchantSalt = tenantSettings.paytr.merchant_salt || activeMerchantSalt
+                    this.logger_.info(`PayTR: Mağaza (Tenant) için özel ödeme entegrasyonu kullanılıyor.`)
+                }
+            }
+        } catch (e: any) {
+            this.logger_.warn(`PayTR: Tenant credentials çekilemedi, globale dönülüyor: ${e.message}`)
+        }
+
         // If credentials are missing, return placeholder
-        if (!this.options_.merchant_id || !this.options_.merchant_key || !this.options_.merchant_salt) {
+        if (!activeMerchantId || !activeMerchantKey || !activeMerchantSalt) {
             this.logger_.warn("PayTR: Missing credentials, returning placeholder.")
             return {
                 id: merchant_oid,
@@ -77,7 +108,7 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
             const user_name = customer.first_name ? `${customer.first_name} ${customer.last_name || ''}`.trim() : "Musteri"
             const user_address = "Sistem Adresi" // Fallback
             const user_phone = customer.phone || "05555555555"
-            const user_email = customer.email || "no-reply@aquahavuz.com"
+            const user_email = customer.email || "no-reply@store.com"
 
             // Medusa amounts are already expected in minor units (e.g. kurus).
             const normalizedAmount = Number(amount)
@@ -101,13 +132,13 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
             const merchant_fail_url = process.env.STORE_CORS ? `${process.env.STORE_CORS}/checkout?error=true` : "http://localhost:8000/checkout?error=true"
 
             // Construct Hash String
-            const hash_str = `${this.options_.merchant_id}${user_ip}${merchant_oid}${user_email}${payment_amount}${user_basket}${no_installment}${max_installment}${currency}${test_mode}`
-            const paytr_token = crypto.createHmac('sha256', this.options_.merchant_key)
-                .update(hash_str + this.options_.merchant_salt)
+            const hash_str = `${activeMerchantId}${user_ip}${merchant_oid}${user_email}${payment_amount}${user_basket}${no_installment}${max_installment}${currency}${test_mode}`
+            const paytr_token = crypto.createHmac('sha256', activeMerchantKey)
+                .update(hash_str + activeMerchantSalt)
                 .digest('base64')
 
             const formData = new URLSearchParams()
-            formData.append('merchant_id', this.options_.merchant_id)
+            formData.append('merchant_id', activeMerchantId)
             formData.append('user_ip', user_ip)
             formData.append('merchant_oid', merchant_oid)
             formData.append('email', user_email)

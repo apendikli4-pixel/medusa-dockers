@@ -25,10 +25,14 @@ class BrevoNotificationProvider extends AbstractNotificationProviderService {
             return {}
         }
 
+        // Mağaza (Tenant) düzeyinde özel gönderici bilgisi varsa onu kullan, yoksa globale dön.
+        const senderName = notification.data?.tenant?.settings?.email_sender_name || this.options.from_name || "System"
+        const senderEmail = notification.data?.tenant?.settings?.email_sender_address || this.options.from_email || "donotreply@example.com"
+
         const payload = {
             sender: {
-                name: this.options.from_name || "System",
-                email: this.options.from_email || "donotreply@example.com"
+                name: senderName,
+                email: senderEmail
             },
             to: [{ email: notification.to }],
             templateId: templateId,

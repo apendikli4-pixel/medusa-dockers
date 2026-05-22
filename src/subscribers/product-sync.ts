@@ -24,7 +24,7 @@ export default async function productSync({
 
         // specific fields for search
         const product = await productService.retrieveProduct(data.id, {
-            relations: ["categories", "variants", "options", "tags", "type", "collection"],
+            relations: ["categories", "variants", "options", "tags", "type", "collection", "sales_channels"],
         })
 
         const document = {
@@ -38,6 +38,8 @@ export default async function productSync({
             tags: product.tags?.map((t: any) => t.value) || [],
             collection: product.collection?.title,
             type: product.type?.value,
+            // Mağaza (Tenant) izolasyonu için sales channel id'lerini ekliyoruz
+            sales_channel_ids: product.sales_channels?.map((sc: any) => sc.id) || [],
             // Variant info for filtering/pricing display
             variants: product.variants?.map((v: any) => ({
                 id: v.id,

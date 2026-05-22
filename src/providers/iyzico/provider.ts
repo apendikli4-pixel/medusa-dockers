@@ -96,7 +96,7 @@ class IyzicoProvider extends AbstractPaymentProvider<IyzicoOptions> {
                     name: customer.first_name || "Müşteri",
                     surname: customer.last_name || "Soyadı",
                     gsmNumber: customer.phone || "+905555555555",
-                    email: customer.email || "no-reply@aquahavuz.com",
+                    email: customer.email || "no-reply@store.com",
                     identityNumber: process.env.IYZICO_TEST_IDENTITY || "12345678901", // Test TC kimlik no
                     lastLoginDate: "2024-01-01 12:00:00",
                     registrationDate: "2024-01-01 12:00:00",
