@@ -1,0 +1,193 @@
+{
+  "name": "Hallucination Killer v2 — Validation Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ayna-grounded-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst message = body.message || body.query || '';\nconst customerId = body.customer_id || body.customerId || null;\nconst customerGroup = body.customer_group || body.customerGroup || 'B2C_Retail';\nconst isAdmin = body.is_admin || body.isAdmin || false;\nconst image = body.image || null;\nconst tenantContext = body.tenant_context || null;\n\nconst stopWords = ['bir','bu','şu','ve','ile','için','var','mı','mi','mu','mü','ne','nasıl','kaç','da','de','den','dan','nedir','olan'];\nconst words = message.toLowerCase()\n  .replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9\\s]/g, '')\n  .split(/\\s+/)\n  .filter(w => w.length > 2 && !stopWords.includes(w));\n\nlet intent = 'general';\nconst msg = message.toLowerCase();\nif (/stok|envanter|kaç\\s*(adet|tane)|mevcut|kaldı/i.test(msg)) intent = 'inventory_check';\nelse if (/sipariş|kargo|takip|nerede|teslimat/i.test(msg)) intent = 'product_search';\nelse if (/ürün|fiyat|ara|bul|var\\s*mı|satıyor/i.test(msg)) intent = 'product_search';\n\nreturn [{ json: {\n  message, customer_id: customerId, customer_group: customerGroup,\n  is_admin: isAdmin, image, search_term: words.join(' '),\n  tenant_context: tenantContext,\n  intent, keywords: words, retry_count: 0, max_retries: 3,\n  validation_errors: [], timestamp: new Date().toISOString()\n}}];"
+      },
+      "id": "extract-intent",
+      "name": "1. Extract Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH matched_products AS (\n  SELECT p.id AS product_id, p.title, p.handle, p.status, p.description\n  FROM product p\n  WHERE p.deleted_at IS NULL AND p.status = 'published'\n    AND (p.title ILIKE '%' || $1 || '%' OR p.description ILIKE '%' || $1 || '%')\n  ORDER BY p.updated_at DESC LIMIT 10\n),\nproduct_full AS (\n  SELECT mp.product_id, mp.title, mp.handle, mp.description,\n    pv.id AS variant_id, pv.title AS variant_title, pv.sku,\n    COALESCE(il.stocked_quantity, 0) AS stocked,\n    COALESCE(il.reserved_quantity, 0) AS reserved,\n    COALESCE(il.stocked_quantity - il.reserved_quantity, 0) AS available,\n    pp_data.price_amount, pp_data.currency_code\n  FROM matched_products mp\n  JOIN product_variant pv ON pv.product_id = mp.product_id AND pv.deleted_at IS NULL\n  LEFT JOIN product_variant_inventory_item pvii ON pvii.variant_id = pv.id\n  LEFT JOIN inventory_item ii ON ii.id = pvii.inventory_item_id AND ii.deleted_at IS NULL\n  LEFT JOIN inventory_level il ON il.inventory_item_id = ii.id\n  LEFT JOIN LATERAL (\n    SELECT pp.amount AS price_amount, pp.currency_code\n    FROM product_variant_price_set pvps\n    JOIN price_set ps ON ps.id = pvps.price_set_id\n    JOIN price pp ON pp.price_set_id = ps.id\n    WHERE pvps.variant_id = pv.id LIMIT 1\n  ) pp_data ON true\n)\nSELECT json_build_object(\n  'products', (SELECT COALESCE(json_agg(row_to_json(pf)), '[]'::json) FROM product_full pf),\n  'product_ids', (SELECT COALESCE(json_agg(DISTINCT pf.product_id), '[]'::json) FROM product_full pf),\n  'variant_ids', (SELECT COALESCE(json_agg(DISTINCT pf.variant_id), '[]'::json) FROM product_full pf),\n  'price_map', (SELECT COALESCE(json_object_agg(pf.variant_id, pf.price_amount), '{}'::json) FROM product_full pf WHERE pf.price_amount IS NOT NULL),\n  'stock_map', (SELECT COALESCE(json_object_agg(pf.variant_id, pf.available), '{}'::json) FROM product_full pf)\n) AS context;",
+        "options": { "queryParams": "={{ $json.search_term }}" }
+      },
+      "id": "query-db",
+      "name": "2. Query DB (Ground Truth)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [640, 300],
+      "credentials": { "postgres": { "id": "MEDUSA_DB_CREDENTIAL_ID", "name": "Medusa Genesis DB" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const intentData = $('1. Extract Intent').first().json;\nconst dbRaw = $('2. Query DB (Ground Truth)').first().json;\n\nlet ctx = { products: [], product_ids: [], variant_ids: [], price_map: {}, stock_map: {} };\ntry {\n  ctx = typeof dbRaw.context === 'string' ? JSON.parse(dbRaw.context) : dbRaw.context || ctx;\n} catch(e) {}\n\nconst lines = [];\nlines.push('=== VERİTABANI BAĞLAMI (GROUND TRUTH) ===');\nlines.push('Aşağıdaki veriler PostgreSQL veritabanından çekilmiştir. SADECE bu verilere dayanarak cevap ver.');\nlines.push('Veritabanında olmayan ürün, fiyat veya stok bilgisi UYDURMA.');\nlines.push('Eğer eşleşme yoksa \"Bu ürün katalogumuzda bulunmuyor\" de.');\nlines.push('');\n\nif (ctx.products && ctx.products.length > 0) {\n  lines.push('── ÜRÜNLER ──');\n  ctx.products.forEach(p => {\n    const price = p.price_amount ? `${(p.price_amount / 100).toFixed(2)} ${p.currency_code || 'TRY'}` : 'Fiyat yok';\n    const stock = p.available !== undefined ? `Stok: ${p.available}` : 'Stok bilgisi yok';\n    lines.push(`• [${p.product_id}] ${p.title} | Varyant: ${p.variant_title || '-'} | SKU: ${p.sku || 'N/A'} | ${price} | ${stock}`);\n  });\n} else {\n  lines.push('── EŞLEŞEN ÜRÜN YOK ──');\n}\n\nconst retryCount = intentData.retry_count || 0;\nconst prevErrors = intentData.validation_errors || [];\nif (retryCount > 0 && prevErrors.length > 0) {\n  lines.push('');\n  lines.push('⚠️ ÖNCEKİ YANIT REDDEDİLDİ. HATALAR:');\n  prevErrors.forEach(e => lines.push(`  ✗ ${e}`));\n  lines.push('BU HATALARI DÜZELTECEĞİM. Sadece gerçek veritabanı verilerine dayanacağım.');\n}\n\nlines.push('');\nlines.push('=== YANITINI JSON FORMATINDA VER ===');\nlines.push('Format: {\"response\": \"...\", \"mentioned_product_ids\": [...], \"mentioned_prices\": [{\"variant_id\": \"...\", \"price\": ..., \"currency\": \"TRY\"}]}');\n\nreturn [{ json: {\n  grounding_context: lines.join('\\n'),\n  tenant_context: intentData.tenant_context,\n  original_message: intentData.message,\n  customer_id: intentData.customer_id,\n  customer_group: intentData.customer_group,\n  is_admin: intentData.is_admin,\n  intent: intentData.intent,\n  search_term: intentData.search_term,\n  retry_count: retryCount,\n  max_retries: intentData.max_retries || 3,\n  db_product_ids: ctx.product_ids || [],\n  db_variant_ids: ctx.variant_ids || [],\n  db_price_map: ctx.price_map || {},\n  db_stock_map: ctx.stock_map || {},\n  product_count: (ctx.products || []).length\n}}];"
+      },
+      "id": "build-context",
+      "name": "3. Build Grounding Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.grounding_context }}\n\n=== KULLANICI SORUSU ===\n{{ $json.original_message }}",
+        "options": {
+          "systemMessage": "Sen Ayna, bu mağazanın AI asistanısın.\n\nMAĞAZA BİLGİSİ (TENANT CONTEXT):\n{{ $json.tenant_context || 'Genel mağaza.' }}\n\nKRİTİK KURALLAR:\n1. YALNIZCA VERİTABANI BAĞLAMI bölümündeki verilere dayan.\n2. Olmayan ürün, fiyat veya stok bilgisi UYDURMA.\n3. Eşleşme yoksa: 'Bu ürün katalogumuzda bulunmuyor' de.\n4. Fiyatlar kuruş cinsindendir, TL'ye çevir (100'e böl).\n5. Stok sayılarını tam ver, yuvarlama.\n6. Dil: Profesyonel, samimi Türkçe.\n\nYANITINI MUTLAKA JSON FORMATINDA VER:\n{\"response\": \"Kullanıcıya gösterilecek metin\", \"mentioned_product_ids\": [\"id1\", \"id2\"], \"mentioned_prices\": [{\"variant_id\": \"...\", \"price\": 1500, \"currency\": \"TRY\"}]}"
+        }
+      },
+      "id": "ai-agent",
+      "name": "4. AI Agent (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "modelId": "gemini-2.0-flash",
+        "options": { "temperature": 0.2 }
+      },
+      "id": "gemini-model",
+      "name": "Gemini LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1120, 520],
+      "credentials": { "googleGeminiApi": { "id": "GEMINI_CREDENTIAL_ID", "name": "Gemini API" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════\n// VALIDATION CHECK — Hallucination Killer Core\n// ══════════════════════════════════════════════\nconst contextData = $('3. Build Grounding Context').first().json;\nconst aiRawOutput = $('4. AI Agent (Gemini)').first().json.output || $('4. AI Agent (Gemini)').first().json.text || '';\nconst retryCount = contextData.retry_count || 0;\nconst maxRetries = contextData.max_retries || 3;\n\nconst errors = [];\nlet parsed = null;\nlet userResponse = '';\nlet mentionedProductIds = [];\nlet mentionedPrices = [];\n\n// ── CHECK 1: JSON Format Geçerli mi? ──\ntry {\n  // AI bazen markdown code block ile sarar\n  let cleaned = aiRawOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  // Bazen sadece metin döner, JSON aramayı dene\n  const jsonMatch = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsed = JSON.parse(jsonMatch[0]);\n    userResponse = parsed.response || '';\n    mentionedProductIds = parsed.mentioned_product_ids || [];\n    mentionedPrices = parsed.mentioned_prices || [];\n  } else {\n    // JSON bulunamadı — düz metin olarak kabul et\n    userResponse = cleaned;\n    // JSON zorunlu değilse bu bir hata değil, ama grounding kontrolü zayıflar\n    errors.push('JSON_FORMAT_INVALID: AI yanıtı geçerli JSON formatında değil. structured output bekleniyor.');\n  }\n} catch (e) {\n  errors.push(`JSON_PARSE_ERROR: AI yanıtı parse edilemedi: ${e.message}`);\n  userResponse = aiRawOutput; // fallback\n}\n\n// ── CHECK 2: Bahsedilen Ürün ID'leri DB'de var mı? ──\nif (mentionedProductIds.length > 0) {\n  const dbProductIds = new Set(contextData.db_product_ids || []);\n  const phantomIds = mentionedProductIds.filter(id => !dbProductIds.has(id));\n  if (phantomIds.length > 0) {\n    errors.push(`PHANTOM_PRODUCT: Veritabanında olmayan ürün ID\\'leri referans edildi: ${phantomIds.join(', ')}. Bu ID\\'ler gerçek değil, UYDURMA.`);\n  }\n}\n\n// ── CHECK 3: Fiyat Bilgisi Doğru mu? ──\nif (mentionedPrices.length > 0) {\n  const dbPriceMap = contextData.db_price_map || {};\n  for (const mp of mentionedPrices) {\n    const dbPrice = dbPriceMap[mp.variant_id];\n    if (dbPrice === undefined) {\n      errors.push(`PHANTOM_PRICE: variant_id=${mp.variant_id} için veritabanında fiyat bulunamadı. Bu fiyat uydurma olabilir.`);\n    } else {\n      // Fiyat tolerance: %1 sapma kabul edilebilir (yuvarlama farkı)\n      const tolerance = dbPrice * 0.01;\n      const aiPrice = mp.price;\n      if (Math.abs(aiPrice - dbPrice) > tolerance) {\n        errors.push(`PRICE_MISMATCH: variant_id=${mp.variant_id} için DB fiyatı=${dbPrice} ama AI fiyatı=${aiPrice}. Doğru fiyat kullanılmalı.`);\n      }\n    }\n  }\n}\n\n// ── CHECK 4: Halüsinasyon Kelime Taraması ──\nconst hallucMarkers = [\n  /\\bindirim(?:li|de)?\\b/i, /kampanya/i, /ücretsiz kargo/i, /taksit/i\n];\nconst dbContext = contextData.grounding_context || '';\nfor (const marker of hallucMarkers) {\n  if (marker.test(userResponse) && !marker.test(dbContext)) {\n    const matched = userResponse.match(marker);\n    errors.push(`HALLUCINATION_SUSPECT: \"${matched?.[0]}\" ifadesi yanıtta var ama veritabanı bağlamında yok. Gerçek mi kontrol edilmeli.`);\n  }\n}\n\n// ── KARAR ──\nconst isValid = errors.length === 0;\nconst shouldRetry = !isValid && retryCount < maxRetries;\n\nreturn [{ json: {\n  is_valid: isValid,\n  should_retry: shouldRetry,\n  errors,\n  error_count: errors.length,\n  retry_count: retryCount,\n  max_retries: maxRetries,\n  ai_response: userResponse,\n  raw_output: aiRawOutput,\n  mentioned_product_ids: mentionedProductIds,\n  mentioned_prices: mentionedPrices,\n  // Pass-through for retry loop\n  original_message: contextData.original_message,\n  customer_id: contextData.customer_id,\n  customer_group: contextData.customer_group,\n  is_admin: contextData.is_admin,\n  intent: contextData.intent,\n  search_term: contextData.search_term,\n  db_product_ids: contextData.db_product_ids,\n  db_variant_ids: contextData.db_variant_ids,\n  db_price_map: contextData.db_price_map,\n  db_stock_map: contextData.db_stock_map,\n  product_count: contextData.product_count\n}}];"
+      },
+      "id": "validation-check",
+      "name": "5. Validation Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "valid", "leftValue": "={{ $json.is_valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "if-valid",
+      "name": "6. Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1620, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  response: $json.ai_response,\n  grounded: true,\n  validated: true,\n  intent: $json.intent,\n  product_count: $json.product_count,\n  validation_passed: true,\n  retry_count: $json.retry_count,\n  timestamp: new Date().toISOString()\n}) }}"
+      },
+      "id": "respond-success",
+      "name": "7a. Respond ✅",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1900, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "can-retry", "leftValue": "={{ $json.should_retry }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "if-can-retry",
+      "name": "7b. Can Retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1900, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retry counter'ı artır ve hata bilgisini geri gönder\nconst prev = $input.first().json;\nreturn [{ json: {\n  message: prev.original_message,\n  customer_id: prev.customer_id,\n  customer_group: prev.customer_group,\n  is_admin: prev.is_admin,\n  image: null,\n  search_term: prev.search_term,\n  intent: prev.intent,\n  keywords: [],\n  retry_count: (prev.retry_count || 0) + 1,\n  max_retries: prev.max_retries || 3,\n  validation_errors: prev.errors || [],\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "id": "prepare-retry",
+      "name": "8. Prepare Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 340]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  response: $json.ai_response || 'Üzgünüm, şu an doğrulanmış bir yanıt üretemiyorum. Lütfen sorunuzu farklı şekilde sormayı deneyin.',\n  grounded: false,\n  validated: false,\n  validation_errors: $json.errors,\n  retry_count: $json.retry_count,\n  max_retries_reached: true,\n  timestamp: new Date().toISOString()\n}) }}"
+      },
+      "id": "respond-fallback",
+      "name": "7c. Respond ⚠️ (Max Retry)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2160, 560]
+    }
+  ],
+  "connections": {
+    "Chat Webhook": {
+      "main": [[{ "node": "1. Extract Intent", "type": "main", "index": 0 }]]
+    },
+    "1. Extract Intent": {
+      "main": [[{ "node": "2. Query DB (Ground Truth)", "type": "main", "index": 0 }]]
+    },
+    "2. Query DB (Ground Truth)": {
+      "main": [[{ "node": "3. Build Grounding Context", "type": "main", "index": 0 }]]
+    },
+    "3. Build Grounding Context": {
+      "main": [[{ "node": "4. AI Agent (Gemini)", "type": "main", "index": 0 }]]
+    },
+    "4. AI Agent (Gemini)": {
+      "main": [[{ "node": "5. Validation Check", "type": "main", "index": 0 }]]
+    },
+    "Gemini LLM": {
+      "ai_languageModel": [[{ "node": "4. AI Agent (Gemini)", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "5. Validation Check": {
+      "main": [[{ "node": "6. Valid?", "type": "main", "index": 0 }]]
+    },
+    "6. Valid?": {
+      "main": [
+        [{ "node": "7a. Respond ✅", "type": "main", "index": 0 }],
+        [{ "node": "7b. Can Retry?", "type": "main", "index": 0 }]
+      ]
+    },
+    "7b. Can Retry?": {
+      "main": [
+        [{ "node": "8. Prepare Retry", "type": "main", "index": 0 }],
+        [{ "node": "7c. Respond ⚠️ (Max Retry)", "type": "main", "index": 0 }]
+      ]
+    },
+    "8. Prepare Retry": {
+      "main": [[{ "node": "2. Query DB (Ground Truth)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "ayna-hallucination-killer-v2-loop" },
+  "tags": [
+    { "name": "AI", "createdAt": "2026-05-06T00:00:00.000Z", "updatedAt": "2026-05-06T00:00:00.000Z" },
+    { "name": "Validation", "createdAt": "2026-05-06T00:00:00.000Z", "updatedAt": "2026-05-06T00:00:00.000Z" },
+    { "name": "Grounding", "createdAt": "2026-05-06T00:00:00.000Z", "updatedAt": "2026-05-06T00:00:00.000Z" }
+  ]
+}
