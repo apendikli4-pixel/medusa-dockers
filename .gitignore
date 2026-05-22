@@ -34,6 +34,7 @@ final_diagnostic*.log
 .env
 .env.*
 !.env.template
+!.env.example
 diagnostic_output*.txt
 final_check.txt
 final_verify_report*.txt
@@ -47,3 +48,23 @@ startup_diagnostics.txt
 
 # Medusa
 .medusa/
+
+# Backups - bunlar projeye girmemeli, Documents/AYNA-BACKUPS altinda tutuyoruz
+backup-*/
+backups/
+*.backup
+db-dumps/
+
+# Root-level debug/throwaway scripts (TypeScript Purity - AGENTS.md)
+/fix-*.js
+/check_*.ts
+/inspect_*.ts
+/test-*.ts
+/*.tmp.ts
+build-log.txt
+
+# Worktrees / kalintı klasörler
+*.worktrees/
+
+# Inner project skeletons (yanlislikla nested olmasin)
+/mirror-core-genesis/
