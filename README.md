@@ -28,25 +28,48 @@ PROJECT-AYNA-GENESIS/
 ├── src/                          # Backend (Medusa v2)
 │   ├── api/                      # API Route'ları
 │   │   ├── admin/               # Admin API'leri
-│   │   └── store/               # Store API'leri (Ayna dahil)
+│   │   │   ├── ayna/            # AI chat admin endpoint
+│   │   │   ├── tenants/         # 🏢 Tenant yönetimi
+│   │   │   └── setup/           # Sistem kurulumu
+│   │   └── store/               # Store API'leri (public)
+│   │       ├── ayna/            # AI chat store endpoint
+│   │       ├── wishlist/        # İstek listesi
+│   │       └── tenant/          # Tenant-specific endpoints
 │   ├── modules/                  # Özel Modüller
 │   │   ├── ayna/                # 🤖 AI Chat Agent
+│   │   ├── tenant/              # 🏢 Multi-Tenancy Modülü
 │   │   ├── content_engine/      # 📝 Blog/CMS Sistemi
-│   │   └── conscience/          # ⚖️ Vicdan Filtresi
-│   ├── workflows/               # İş Akışları
-│   ├── providers/               # 🔌 Entegrasyon Sağlayıcıları (PayTR, Brevo, vb.)
-│   └── lib/                     # Yardımcı Fonksiyonlar
+│   │   ├── conscience/          # ⚖️ Vicdan Filtresi
+│   │   ├── wishlist/            # ❤️ İstek Listesi
+│   │   ├── subscription/        # 🔄 Abonelik (BETA)
+│   │   └── loyalty/             # 🏆 Sadakat Programı (BETA)
+│   ├── workflows/               # İş Akışları (Saga Pattern)
+│   ├── links/                   # Cross-Module Entity Linkleri
+│   ├── providers/               # 🔌 Entegrasyon Sağlayıcıları
+│   ├── middlewares/             # API Middleware'ler
+│   ├── subscribers/             # Event-Driven Handler'lar
+│   ├── jobs/                    # Scheduled Background Jobs
+│   ├── lib/                     # Yardımcı Kütüphaneler
+│   └── utils/                   # Utility Fonksiyonlar
 │
 ├── storefront/                   # Frontend (Next.js 15)
 │   ├── src/
 │   │   ├── app/                 # App Router Sayfaları
+│   │   │   ├── [countryCode]/   # Locale-aware routes
+│   │   │   └── api/             # Next.js API routes
 │   │   ├── modules/             # UI Bileşenleri
+│   │   │   └── chat/            # Ayna chat widget
 │   │   └── lib/                 # Veri Katmanı
 │   └── next.config.js
 │
 ├── docs/                         # Dokümantasyon
 │   └── GENESIS_PROTOCOL/        # Mimari Protokol
 │
+├── n8n/                          # N8N workflow otomasyonu
+│   ├── workflows/               # AI validation workflows
+│   └── sql-templates/           # SQL grounding templates
+│
+├── docker/                       # Docker yapılandırması
 ├── docker-compose.yml            # Docker Konfigürasyonu
 ├── medusa-config.ts              # Medusa Ayarları
 └── .env                          # Environment Değişkenleri
@@ -56,10 +79,24 @@ PROJECT-AYNA-GENESIS/
 
 ## 🏗️ Mimari Genel Bakış
 
+### Multi-Tenant SaaS Mimarisi
+
+Platform, **çoklu mağaza (multi-tenant)** desteği ile her mağazanın verilerini tamamen izole eder:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      STOREFRONT (Next.js 15)                 │
-│                      http://localhost:8000                   │
+│                    TENANT A                 TENANT B         │
+│              (Aqua Havuz Antalya)    (Aqua Havuz İzmir)     │
+│                  tenant_id: uuid_a       tenant_id: uuid_b   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              TENANT ISOLATION LAYERS (4 Katman)              │
+│  1. Tenant Context Middleware (Fail-Closed)                  │
+│  2. AsyncLocalStorage Propagation                            │
+│  3. Database Guard (Awilix Scope)                            │
+│  4. Row Level Security (RLS) Global Filter                   │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -67,8 +104,8 @@ PROJECT-AYNA-GENESIS/
 │                    MEDUSA SERVER (API)                       │
 │                    http://localhost:9000                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │   Ayna   │  │ Content  │  │ Conscience│  │  Manual  │    │
-│  │  Agent   │  │  Engine  │  │  Filter   │  │ Payment  │    │
+│  │   Ayna   │  │  Tenant  │  │ Conscience│  │  Manual  │    │
+│  │  Agent   │  │  Module  │  │  Filter   │  │ Payment  │    │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
 └─────────────────────────────────────────────────────────────┘
         │              │              │              │
@@ -84,6 +121,26 @@ PROJECT-AYNA-GENESIS/
 │  PostgreSQL  │    │    Redis     │    │ Meilisearch  │
 │   (pgvector) │    │   (Cache)    │    │  (Search)    │
 └──────────────┘    └──────────────┘    └──────────────┘
+```
+
+### n8n AI Orchestration
+
+LLM çağrıları n8n üzerinden SQL grounding ve validation loop ile işlenir:
+
+```
+Storefront → /api/chat → N8nBridge → n8n Webhook
+                                    │
+                                    ▼
+                            ┌───────────────┐
+                            │ 1. Intent     │
+                            │ 2. SQL Ground │
+                            │ 3. AI Agent   │
+                            │ 4. Validate   │
+                            │ 5. Retry Loop │
+                            └───────────────┘
+                                    │
+                                    ▼
+                            Hallucination-Free Response
 ```
 
 ---
@@ -133,9 +190,24 @@ GEMINI_MODEL_NAME=gemini-1.5-flash
 OLLAMA_API_URL=http://localhost:11434/api/generate
 OLLAMA_MODEL_NAME=llama3
 
+# n8n AI Orchestration
+N8N_BRIDGE_ENABLED=false
+N8N_WEBHOOK_URL=http://n8n:5678
+N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
+N8N_TIMEOUT_MS=30000
+
 # Arama
 MEILISEARCH_HOST=http://meilisearch:7700
 MEILISEARCH_MASTER_KEY=masterKey123
+
+# JWT & Security (Production'da güçlü değerler kullanın!)
+JWT_SECRET=your_strong_jwt_secret
+COOKIE_SECRET=your_strong_cookie_secret
+
+# CORS
+STORE_CORS=http://localhost:8000,http://localhost:3000
+ADMIN_CORS=http://localhost:9000,http://localhost:5173
+AUTH_CORS=http://localhost:9000,http://localhost:8000
 ```
 
 ---

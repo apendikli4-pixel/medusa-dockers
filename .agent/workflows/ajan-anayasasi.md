@@ -30,7 +30,16 @@ Her `task_boundary` çağrısından ÖNCE, ajan aşağıdaki kontrol listesini z
 4.  [ ] Durum raporu, gerçeği olduğu gibi yansıtıyor mu (başarı/başarısızlık)?
 
 Bu listeden herhangi biri "Hayır" ise, ajan işlemi düzeltir ve ardından devam eder.
-BU MİMARİ MEDUSA V2 NEX JS İLE İNŞA EDİLECEK OTONOM BİR E TİCARET EKOSİSTEMİDİR  MODÜLER YAPI
+
+## MADDE 5: SAAS (SHOPIFY ALTERNATİFİ) VİZYONU
+- **ZORUNLU:** Bu proje tek bir sektör (örn. havuz malzemesi) için yazılmış basit bir e-ticaret sitesi DEĞİLDİR. Bu sistem; Shopify, Ticimax, IdeaSoft gibi satılabilir, ücretli abonelikle çalışan, binlerce farklı mağazayı (tenant) içinde barındıracak devasa bir **Hizmet Olarak Yazılım (SaaS)** platformudur.
+- **ÖLÇÜT:** Yazılacak her kod, her veritabanı tablosu ve eklenecek her yeni özellik mutlak suretle **Multi-Tenant (Çoklu Mağaza) izolasyonuna** sahip olmalı, temalar dinamik olarak markalara göre değişebilmeli ve ajanın icat ettiği yenilikler "Diğer sektörlerdeki müşterilere satılabilir mi?" vizyonuyla değerlendirilmelidir. Ajan hiçbir zaman tek bir markanın kodlayıcısı gibi değil, global bir SaaS ürününün mimarı gibi düşünmelidir.
+
+## MADDE 6: AJAN İŞ AKIŞI KOORDİNASYONU
+- **ZORUNLU:** Her geliştirme çalışmasında `.agent/workflows/WORKFLOW_COORDINATOR.md` dosyasındaki ajan ekosistemi kurallarına uyulmalıdır.
+- **ZORUNLU:** Evrim Motoru çatı ajan olarak, diğer 7 uzman ajandan (Araştırmacı, Kod Denetçisi, Test Mühendisi, DevOps Uzmanı, Güvenlik Uzmanı, Dokümantasyon Uzmanı, SEO Uzmanı) gelen girdileri sentezleyerek bütünsel çözümler üretmelidir.
+- **ÖLÇÜT:** Bir özellik geliştirilirken en az 3 farklı ajan perspektifinden değerlendirilmiş olmalıdır (örn: güvenlik + test + dokümantasyon).
+
 ---
 **Yürürlük Tarihi:** 2026-01-31
 **Hazırlayan:** Kullanıcı Talebi Üzerine Antigravity
