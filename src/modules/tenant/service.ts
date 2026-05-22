@@ -13,6 +13,7 @@ import { MedusaService } from "@medusajs/framework/utils"
 import { Logger } from "@medusajs/framework/types"
 import { Tenant } from "./models/tenant"
 import TenantBusinessService from "./services/tenant-business.service"
+import { SectorRegistry } from "../../lib/sector-framework"
 import type {
     CreateTenantDTO,
     UpdateTenantDTO,
@@ -188,43 +189,22 @@ export default class TenantService extends MedusaService({
     /**
      * Sektöre özel yapılandırma — AI ajanlarının üslubunu belirler.
      *
-     * Her sektör için:
-     * - tone: AI'ın konuşma tonu
-     * - expertise: Uzmanlık alanı anahtar kelimeleri
-     * - contentStyle: İçerik üretim stili
+     * Sektör tanımları artık `lib/sector-framework` içinde tek noktada
+     * tutulur. Bu metod, geriye uyumluluk için eski `SectorConfig`
+     * şeklini (tone/expertise/contentStyle/defaultTaxRate) korur.
      *
-     * Ölçekleme notu: Yeni sektör eklendiğinde buraya eklenir.
-     * Mağaza sayısı 50'ye ulaştığında bu yapılandırma Redis cache'e alınabilir.
+     * Bilinmeyen sektör için retail varsayılanına düşer; bu sayede
+     * data hatası uygulamayı kırmaz, sadece muhafazakar tona geçer.
      */
     getSectorConfig(sector: string): SectorConfig {
-        const configs: Record<string, SectorConfig> = {
-            retail: {
-                tone: "samimi ve bilgilendirici",
-                expertise: ["ürün özellikleri", "stok durumu", "fiyat karşılaştırma"],
-                contentStyle: "kısa, net, müşteri odaklı",
-                defaultTaxRate: 20,
-            },
-            horeca: {
-                tone: "profesyonel ve çözüm odaklı",
-                expertise: ["toplu sipariş", "kurulum hizmeti", "teknik destek", "proje bazlı fiyatlama"],
-                contentStyle: "teknik detaylı, proje odaklı",
-                defaultTaxRate: 20,
-            },
-            b2b: {
-                tone: "resmi ve güven veren",
-                expertise: ["toptan fiyatlama", "minimum sipariş", "lojistik planlama", "fatura yönetimi"],
-                contentStyle: "kurumsal, veri odaklı",
-                defaultTaxRate: 20,
-            },
-            fashion: {
-                tone: "enerjik ve trend odaklı",
-                expertise: ["beden rehberi", "stil önerileri", "kumaş bilgisi", "sezon trendleri"],
-                contentStyle: "görsel ağırlıklı, ilham verici",
-                defaultTaxRate: 10,
-            },
+        const code = SectorRegistry.isSupported(sector) ? sector : "retail"
+        const cfg = SectorRegistry.get(code)
+        return {
+            tone: cfg.ai.tone,
+            expertise: cfg.ai.expertise,
+            contentStyle: cfg.ai.contentStyle,
+            defaultTaxRate: cfg.defaultSettings.taxRate,
         }
-
-        return configs[sector] || configs.retail
     }
 }
 
