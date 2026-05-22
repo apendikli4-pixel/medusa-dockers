@@ -9,3 +9,7 @@ export * from "./update-post"
 export * from "./create-mission"
 export * from "./update-inventory-sync"
 export * from "./autonomous-inventory-plan"
+export * from "./link-entity-to-tenant"
+export * from "./create-tenant"
+
+

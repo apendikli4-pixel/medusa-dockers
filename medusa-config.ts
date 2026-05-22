@@ -16,7 +16,28 @@ if (process.env.NODE_ENV === "production") {
 module.exports = defineConfig({
     projectConfig: {
         databaseUrl: process.env.DATABASE_URL,
+        // ─── Redis HA Yapılandırması ───
+        // Medusa V2 Durable Execution Engine tüm workflow durumlarını PostgreSQL'de tutar.
+        // Redis sadece mesaj kuyruğu (queue) ve pub/sub olarak kullanılır.
+        // Sentinel yapısı docker-compose.yml'de tanımlıdır.
         redisUrl: process.env.REDIS_URL,
+        redisOptions: {
+            // Bağlantı koptuğunda exponential backoff ile yeniden deneme
+            retryStrategy(times: number): number | null {
+                if (times > 20) {
+                    // 20 denemeden sonra bağlantıyı bırak — Sentinel failover tamamlanmış olmalı
+                    console.error(`[Redis] Max retry reached (${times}). Giving up.`)
+                    return null
+                }
+                // Exponential backoff: 100ms, 200ms, 400ms, ... max 5s
+                return Math.min(times * 100, 5000)
+            },
+            maxRetriesPerRequest: 3,        // Her istek için max 3 deneme
+            connectTimeout: 10000,          // Bağlantı timeout: 10s
+            commandTimeout: 5000,           // Komut timeout: 5s
+            enableReadyCheck: true,         // Bağlantı hazır kontrolü
+            lazyConnect: false,             // Hemen bağlan
+        },
         workerMode: (process.env.MEDUSA_WORKER_MODE as "shared" | "worker" | "server") ?? "shared",
         http: {
             storeCors: process.env.STORE_CORS || "http://localhost:8000,http://localhost:3000",
@@ -87,6 +108,9 @@ module.exports = defineConfig({
         wishlist: {
             resolve: "./src/modules/wishlist",
         },
+        tenant: {
+            resolve: "./src/modules/tenant",
+        },
         promotion: {
             resolve: "@medusajs/promotion",
             options: {},
@@ -107,8 +131,8 @@ module.exports = defineConfig({
                         id: "brevo",
                         options: {
                             api_key: process.env.BREVO_API_KEY,
-                            from_email: process.env.BREVO_FROM_EMAIL || "donotreply@aquahavuz.com",
-                            from_name: process.env.BREVO_FROM_NAME || "Aqua Havuz",
+                            from_email: process.env.BREVO_FROM_EMAIL || "donotreply@store.com",
+                            from_name: process.env.BREVO_FROM_NAME || "Ayna Store",
                         },
                     }
                 ],

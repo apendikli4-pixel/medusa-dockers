@@ -28,19 +28,23 @@ medusa db:migrate || { echo "Migrations failed"; exit 1; }
 
 if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
     echo "Starting role: $MEDUSA_WORKER_MODE"
-    echo "Cleaning build artifacts..."
-    if [ ! -d "/server/node_modules" ]; then
-        echo "node_modules not found. Installing..."
-        npm install --legacy-peer-deps
+    if [ "$NODE_ENV" != "production" ]; then
+        echo "Development environment detected. Cleaning build artifacts..."
+        if [ ! -d "/server/node_modules" ]; then
+            echo "node_modules not found. Installing..."
+            npm install --legacy-peer-deps
+        else
+            echo "node_modules found. Skipping install."
+        fi
+        ./node_modules/.bin/medusa build || { echo "Build failed"; exit 1; }
+        if [ -f "/server/dist/public/admin/index.html" ]; then
+            echo "Syncing admin build into runtime public directory..."
+            rm -rf /server/public/admin
+            mkdir -p /server/public
+            cp -R /server/dist/public/admin /server/public/admin
+        fi
     else
-        echo "node_modules found. Skipping install."
-    fi
-    ./node_modules/.bin/medusa build || { echo "Build failed"; exit 1; }
-    if [ -f "/server/dist/public/admin/index.html" ]; then
-        echo "Syncing admin build into runtime public directory..."
-        rm -rf /server/public/admin
-        mkdir -p /server/public
-        cp -R /server/dist/public/admin /server/public/admin
+        echo "Production environment detected. Skipping redundant build..."
     fi
     echo "Starting Medusa..."
     ./node_modules/.bin/medusa start &

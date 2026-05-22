@@ -47,6 +47,7 @@ WORKDIR /server
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built application

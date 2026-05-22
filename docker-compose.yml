@@ -1,67 +1,221 @@
 services:
-  # PostgreSQL Database
+  # ═══════════════════════════════════════════════════════════════
+  # PostgreSQL Database (pgvector)
+  # ═══════════════════════════════════════════════════════════════
   postgres:
     image: pgvector/pgvector:pg15
     container_name: medusa_postgres_v2
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-medusa-store}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-medusa_db_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-n8n-db.sql:/docker-entrypoint-initdb.d/init-n8n-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medusa_db_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - medusa_network
 
-  # Redis
-  redis:
-    image: redis:alpine
-    container_name: medusa_redis
+  # ═══════════════════════════════════════════════════════════════
+  # Redis HA: Master Node
+  # AOF + RDB persistence ile veri kaybı önlenir
+  # ═══════════════════════════════════════════════════════════════
+  redis-master:
+    image: redis:7-alpine
+    container_name: medusa_redis_master
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass R3d1sSecurePass2026
+      --masterauth R3d1sSecurePass2026
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
+    volumes:
+      - redis_master_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "R3d1sSecurePass2026", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - medusa_network
 
+  # ═══════════════════════════════════════════════════════════════
+  # Redis HA: Replica Node (Slave)
+  # Master'dan replikasyon alır, otomatik failover için hazır
+  # ═══════════════════════════════════════════════════════════════
+  redis-replica:
+    image: redis:7-alpine
+    container_name: medusa_redis_replica
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass R3d1sSecurePass2026
+      --masterauth R3d1sSecurePass2026
+      --replicaof redis-master 6379
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+    expose:
+      - "6379"
+    volumes:
+      - redis_replica_data:/data
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "R3d1sSecurePass2026", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medusa_network
+
+  # ═══════════════════════════════════════════════════════════════
+  # Redis Sentinel 1 — Master izleme ve otomatik failover
+  # ═══════════════════════════════════════════════════════════════
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: medusa_sentinel_1
+    restart: unless-stopped
+    command: >
+      sh -c '
+      cat > /tmp/sentinel.conf << EOF
+      port 26379
+      sentinel monitor medusa-master redis-master 6379 2
+      sentinel auth-pass medusa-master R3d1sSecurePass2026
+      sentinel down-after-milliseconds medusa-master 5000
+      sentinel failover-timeout medusa-master 10000
+      sentinel parallel-syncs medusa-master 1
+      EOF
+      redis-sentinel /tmp/sentinel.conf'
+    expose:
+      - "26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - medusa_network
+
+  # ═══════════════════════════════════════════════════════════════
+  # Redis Sentinel 2
+  # ═══════════════════════════════════════════════════════════════
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: medusa_sentinel_2
+    restart: unless-stopped
+    command: >
+      sh -c '
+      cat > /tmp/sentinel.conf << EOF
+      port 26379
+      sentinel monitor medusa-master redis-master 6379 2
+      sentinel auth-pass medusa-master R3d1sSecurePass2026
+      sentinel down-after-milliseconds medusa-master 5000
+      sentinel failover-timeout medusa-master 10000
+      sentinel parallel-syncs medusa-master 1
+      EOF
+      redis-sentinel /tmp/sentinel.conf'
+    expose:
+      - "26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - medusa_network
+
+  # ═══════════════════════════════════════════════════════════════
+  # Redis Sentinel 3
+  # ═══════════════════════════════════════════════════════════════
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: medusa_sentinel_3
+    restart: unless-stopped
+    command: >
+      sh -c '
+      cat > /tmp/sentinel.conf << EOF
+      port 26379
+      sentinel monitor medusa-master redis-master 6379 2
+      sentinel auth-pass medusa-master R3d1sSecurePass2026
+      sentinel down-after-milliseconds medusa-master 5000
+      sentinel failover-timeout medusa-master 10000
+      sentinel parallel-syncs medusa-master 1
+      EOF
+      redis-sentinel /tmp/sentinel.conf'
+    expose:
+      - "26379"
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks:
+      - medusa_network
+
+  # ═══════════════════════════════════════════════════════════════
   # Meilisearch (Hybrid Search Engine)
+  # ═══════════════════════════════════════════════════════════════
   meilisearch:
     image: getmeili/meilisearch:v1.13
     container_name: medusa_meilisearch
     environment:
-      - MEILI_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - MEILI_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
       - MEILI_NO_ANALYTICS=true
-    ports:
-      - "7700:7700"
+    expose:
+      - "7700"
     volumes:
       - meilisearch_data:/meili_data
     restart: unless-stopped
     networks:
       - medusa_network
 
-  # 1. MEDUSA SERVER (SOVEREIGN: API ONLY)
+  # ═══════════════════════════════════════════════════════════════
+  # MEDUSA SERVER (API ONLY)
+  # ═══════════════════════════════════════════════════════════════
   medusa-server:
     build: .
     container_name: medusa_server_core_v2
     working_dir: /server
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
     command: [ "/bin/sh", "./start.sh" ]
     ports:
       - "9000:9000"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medusa-genesis
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
       - MEDUSA_WORKER_MODE=server
-      - JWT_SECRET=${JWT_SECRET:-supersecret}
-      - COOKIE_SECRET=${COOKIE_SECRET:-supersecret}
+      - JWT_SECRET=${JWT_SECRET}
+      - COOKIE_SECRET=${COOKIE_SECRET}
       - MEILISEARCH_HOST=http://meilisearch:7700
-      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
       - NODE_OPTIONS=--max-old-space-size=4096
+      # Redis Sentinel config
+      - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_SENTINEL_MASTER_NAME=medusa-master
+      - REDIS_PASSWORD=R3d1sSecurePass2026
+      # n8n Bridge
+      - N8N_BRIDGE_ENABLED=${N8N_BRIDGE_ENABLED:-false}
+      - N8N_WEBHOOK_URL=http://n8n:5678
+      - N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
+      - N8N_TIMEOUT_MS=30000
     env_file:
       - .env
     volumes:
@@ -70,7 +224,9 @@ services:
     networks:
       - medusa_network
 
-  # 2. MEDUSA WORKER (SOVEREIGN: WORKER ONLY)
+  # ═══════════════════════════════════════════════════════════════
+  # MEDUSA WORKER (WORKER ONLY)
+  # ═══════════════════════════════════════════════════════════════
   medusa-worker:
     build: .
     container_name: medusa_worker_core_v2
@@ -79,18 +235,27 @@ services:
     depends_on:
       - medusa-server
       - postgres
-      - redis
+      - redis-master
     command: [ "/bin/sh", "./start.sh" ]
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medusa-genesis
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
       - MEDUSA_WORKER_MODE=worker
-      - JWT_SECRET=${JWT_SECRET:-supersecret}
-      - COOKIE_SECRET=${COOKIE_SECRET:-supersecret}
+      - JWT_SECRET=${JWT_SECRET}
+      - COOKIE_SECRET=${COOKIE_SECRET}
       - MEILISEARCH_HOST=http://meilisearch:7700
-      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY:-masterKey123}
+      - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
       - NODE_OPTIONS=--max-old-space-size=4096
+      # Redis Sentinel config
+      - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_SENTINEL_MASTER_NAME=medusa-master
+      - REDIS_PASSWORD=R3d1sSecurePass2026
+      # n8n Bridge
+      - N8N_BRIDGE_ENABLED=${N8N_BRIDGE_ENABLED:-false}
+      - N8N_WEBHOOK_URL=http://n8n:5678
+      - N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
+      - N8N_TIMEOUT_MS=30000
     env_file:
       - .env
     volumes:
@@ -99,7 +264,9 @@ services:
     networks:
       - medusa_network
 
-  # 3. STOREFRONT
+  # ═══════════════════════════════════════════════════════════════
+  # STOREFRONT (Next.js 15)
+  # ═══════════════════════════════════════════════════════════════
   storefront:
     build:
       context: ./storefront
@@ -107,6 +274,7 @@ services:
     container_name: medusa_storefront
     working_dir: /app
     restart: unless-stopped
+    command: ["npm", "run", "dev"]
     ports:
       - "8000:8000"
     environment:
@@ -127,9 +295,43 @@ services:
     depends_on:
       - medusa-server
 
+  # ═══════════════════════════════════════════════════════════════
+  # n8n — Workflow Automation
+  # ═══════════════════════════════════════════════════════════════
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: medusa_n8n
+    restart: unless-stopped
+    expose:
+      - "5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${TZ:-Europe/Istanbul}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - medusa_network
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
+  redis_master_data:
+  redis_replica_data:
   meilisearch_data:
+  n8n_data:
 
 networks:
   medusa_network:
