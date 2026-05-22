@@ -16,7 +16,7 @@ const adminChatRateLimiter = createRateLimiter(RATE_LIMITS.admin.limit)
  * Admin Zihni — Tüm tool'lar açık, sınırsız AI erişimi
  * Rate limit: 200 requests per 15 minutes per admin user
  */
-export async function POST(req: MedusaRequest, MedusaResponse) {
+export async function POST(req: MedusaRequest, res: MedusaResponse) {
     try {
         const blocked = await applyRateLimit(req, res, adminChatRateLimiter)
         if (blocked) return
@@ -38,6 +38,7 @@ export async function POST(req: MedusaRequest, MedusaResponse) {
 
         const result = await aynaService.processMessage(message, {
             isAdmin: true,
+            tenantId: (req as any).tenant_id,
             customerGroup: "ADMIN",
             productModuleService,
             inventoryService,

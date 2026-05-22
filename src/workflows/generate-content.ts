@@ -6,6 +6,7 @@ import {
 } from "@medusajs/framework/workflows-sdk"
 import { Modules } from "@medusajs/framework/utils"
 import { CONTENT_ENGINE_MODULE } from "../modules/content_engine"
+import { TENANT_MODULE } from "../modules/tenant"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 import { AI_CONFIG } from "../lib/ai-config"
@@ -23,11 +24,31 @@ const getProductStep = createStep(
 )
 
 // =============================================================================
+// ADIM 1.5: Tenant Bağlamını Çek (Sektörel İçerik Ajanı Desteği)
+// =============================================================================
+const getTenantContextStep = createStep(
+    "get-tenant-context-for-content",
+    async (input: { tenantId?: string }, { container }) => {
+        if (!input.tenantId) {
+            return new StepResponse(null)
+        }
+        try {
+            const tenantService = container.resolve(TENANT_MODULE) as any
+            const context = await tenantService.getTenantContext(input.tenantId)
+            return new StepResponse(context)
+        } catch {
+            // Tenant modülü hazır değilse sessizce geç
+            return new StepResponse(null)
+        }
+    }
+)
+
+// =============================================================================
 // ADIM 2: GERÇEK YAPAY ZEKA (GEMINI) İLE İÇERİK ÜRET
 // =============================================================================
 const generateAIContentStep = createStep(
     "generate-ai-content",
-    async (product: any, { container }) => {
+    async (input: { product: any; tenantContext: any }, { container }) => {
         const apiKey = process.env.GEMINI_API_KEY
 
         if (!apiKey) {
@@ -38,11 +59,29 @@ const generateAIContentStep = createStep(
         const modelName = AI_CONFIG.geminiModel
         const model = genAI.getGenerativeModel({ model: modelName })
 
+        const product = input.product
+        const tenantCtx = input.tenantContext
+
+        // ─── Sektörel bağlam bilgisi (Sektörel İçerik Ajanı desteği) ───
+        const sectorInstruction = tenantCtx
+            ? `
+            ÖNEMLİ BAĞLAM:
+            Bu ürün "${tenantCtx.name}" mağazasına aittir.
+            Sektör: ${tenantCtx.sector}
+            İçerik tonu: ${tenantCtx.sectorConfig.tone}
+            İçerik stili: ${tenantCtx.sectorConfig.contentStyle}
+            Uzmanlık alanları: ${tenantCtx.sectorConfig.expertise.join(", ")}
+            Dil: ${tenantCtx.locale}
+            Para birimi: ${tenantCtx.currency}
+            İçeriği bu mağazanın sektörüne ve üslubuna uygun yaz.
+            `
+            : ""
+
         // Zekaya verilecek emir (Prompt Engineering)
         const prompt = `
             Sen profesyonel bir SEO uzmanı ve metin yazarısın.
             Aşağıdaki ürün için Türkçe, satış odaklı bir blog yazısı hazırla.
-            
+            ${sectorInstruction}
             Ürün Adı: ${product.title}
             Ürün Açıklaması (Varsa): ${product.description || "Bu harika bir ürün."}
             
@@ -108,9 +147,10 @@ const createPostStep = createStep(
 // =============================================================================
 export const generateContentWorkflow = createWorkflow(
     "generate-seo-post-workflow",
-    (input: { productId: string }) => {
+    (input: { productId: string; tenantId?: string }) => {
         const product = getProductStep({ productId: input.productId })
-        const generatedData = generateAIContentStep(product)
+        const tenantContext = getTenantContextStep({ tenantId: input.tenantId })
+        const generatedData = generateAIContentStep({ product, tenantContext })
         const post = createPostStep(generatedData)
         return new WorkflowResponse(post)
     }

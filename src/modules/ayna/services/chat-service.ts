@@ -5,16 +5,17 @@ import AynaMemoryService from "./memory-service"
 import AynaToolService from "./tool-service"
 import { HybridAIProviderService } from "./hybrid-ai.provider"
 import { SemanticCacheService, CacheType } from "../../../lib/cache/semantic-cache.service"
+import { N8nBridgeService } from "../../../lib/n8n-bridge"
 // Import injection detector service
 import InjectionDetectorService from "../../../modules/conscience/services/injection-detector.service"
 
 // Tool definitions (Importing placeholders for context)
-import { poolCalculatorTool } from "../tools/pool-calculator-tool"
+import { volumeCalculatorTool } from "../tools/volume-calculator-tool"
 import { productSearchTool } from "../tools/product-tool"
 import { inventoryCheckTool } from "../tools/inventory-tool"
 import { conscienceTool } from "../tools/conscience-tool"
 
-const STORE_TOOLS = [poolCalculatorTool, productSearchTool, inventoryCheckTool, conscienceTool]
+const STORE_TOOLS = [volumeCalculatorTool, productSearchTool, inventoryCheckTool, conscienceTool]
 
 type InjectedDependencies = {
     logger: Logger
@@ -31,6 +32,7 @@ export default class AynaChatService {
     protected hybridAIProvider_: HybridAIProviderService
     protected injectionDetectorService_: InjectionDetectorService
     protected semanticCache_: SemanticCacheService
+    protected n8nBridge_: N8nBridgeService
 
     constructor({ logger, aynaMemoryService, aynaToolService, hybridAIProvider, injectionDetectorService }: InjectedDependencies) {
         this.logger_ = logger
@@ -39,6 +41,7 @@ export default class AynaChatService {
         this.hybridAIProvider_ = hybridAIProvider
         this.injectionDetectorService_ = injectionDetectorService
         this.semanticCache_ = SemanticCacheService.getInstance()
+        this.n8nBridge_ = new N8nBridgeService(logger)
     }
 
     async processMessage(
@@ -75,6 +78,79 @@ export default class AynaChatService {
         }
         
         const isAdmin = options.isAdmin || false
+        
+        let tenantContext = ""
+        if (options.tenantId && options.remoteQuery) {
+            try {
+                const { data } = await options.remoteQuery.graph({
+                    entity: "tenant",
+                    fields: ["name", "sector", "settings", "features"],
+                    filters: { id: options.tenantId }
+                });
+                if (data && data.length > 0) {
+                    const t = data[0];
+                    tenantContext = `Mağaza: ${t.name}. Sektör: ${t.sector}. Ayarlar: ${JSON.stringify(t.settings || {})}`;
+                }
+            } catch (e) {
+                this.logger_.warn(`[AynaChat] Failed to fetch tenant context for ${options.tenantId}`);
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // n8n BRIDGE — Grounded + Validated AI
+        // Eğer n8n köprüsü aktifse tüm mesajlar n8n'e yönlendirilir.
+        // n8n tarafında: SQL grounding → AI Agent → Validation Loop
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        if (this.n8nBridge_.isEnabled()) {
+            try {
+                this.logger_.info("[AynaChat] Routing to n8n bridge (grounded mode)")
+
+                const n8nResponse = await this.n8nBridge_.chat({
+                    message,
+                    customer_id: options.customerId || null,
+                    customer_group: options.customerGroup || "B2C_Retail",
+                    is_admin: isAdmin,
+                    image: options.image || null,
+                    tenant_id: options.tenantId || null,
+                    tenant_context: tenantContext || null,
+                })
+
+                // Record truth even when using n8n
+                await this.memoryService_.recordTruth(
+                    options.customerId || "anonymous",
+                    "chat_n8n",
+                    {
+                        message: message.substring(0, 50),
+                        grounded: n8nResponse.grounded,
+                        validated: n8nResponse.validated,
+                        intent: n8nResponse.intent,
+                        retryCount: n8nResponse.retry_count || 0,
+                    }
+                )
+
+                return {
+                    response: n8nResponse.response,
+                    debug: {
+                        model: "n8n-grounded-gemini",
+                        provider: "n8n",
+                        grounded: n8nResponse.grounded,
+                        validated: n8nResponse.validated,
+                        intent: n8nResponse.intent,
+                        productCount: n8nResponse.product_count,
+                        retryCount: n8nResponse.retry_count,
+                        isAdmin,
+                    },
+                }
+            } catch (n8nError: unknown) {
+                const errMsg = n8nError instanceof Error ? n8nError.message : String(n8nError)
+                this.logger_.warn(`[AynaChat] n8n bridge failed, falling back to direct LLM: ${errMsg}`)
+                // Fall through to direct LLM below
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // DIRECT LLM FALLBACK — Eski akış (n8n kapalıysa veya erişilemezse)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         // Determine cache type (skip if image query; different modalities not cacheable together)
         let cacheType: CacheType = CacheType.GENERAL;
@@ -86,7 +162,7 @@ export default class AynaChatService {
         // Attempt semantic cache retrieval (only for text-only queries)
         if (!hasImage) {
             try {
-                const cached = await this.semanticCache_.get(message);
+                const cached = await this.semanticCache_.get(message, options.tenantId);
                 if (cached) {
                     this.logger_.info("Semantic cache hit", {
                         query: message.substring(0, 50),
@@ -136,7 +212,7 @@ export default class AynaChatService {
         const systemPrompt = isAdmin ? ADMIN_SYSTEM_PROMPT : GUARDIAN_SYSTEM_PROMPT
 
         // Combine system prompt with user message for the AI provider
-        const fullPrompt = `${systemPrompt}\n\nUser message: ${message}`
+        const fullPrompt = `${systemPrompt}\n\nTenant Context:\n${tenantContext}\n\nUser message: ${message}`
 
         // Generate response using hybrid AI provider
         const aiResponse = await this.hybridAIProvider_.generateText(fullPrompt, genOptions)
@@ -169,7 +245,7 @@ export default class AynaChatService {
                     provider: aiResponse.providerUsed,
                     timestamp: Date.now(),
                     type: cacheType
-                });
+                }, options.tenantId);
             } catch (err: any) {
                 this.logger_.error("Semantic cache set error", { error: err.message });
             }

@@ -60,6 +60,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             customerGroup,
             image,
             isAdmin: false,
+            tenantId: (req as any).tenant_id,
             productModuleService,
             inventoryService,
             remoteQuery,
@@ -69,6 +70,13 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     } catch (error: any) {
         const logger = req.scope.resolve("logger") as any
         logger.error(`[Store Ayna Chat] Error: ${error.message}`)
+
+        if (error instanceof z.ZodError || error.name === "ZodError") {
+            return res.status(400).json({
+                error: "Geçersiz istek",
+                details: error.errors,
+            })
+        }
 
         return res.status(200).json({
             response: "Şu an teknik bakım yapılıyor. Lütfen birkaç dakika sonra tekrar deneyin.",

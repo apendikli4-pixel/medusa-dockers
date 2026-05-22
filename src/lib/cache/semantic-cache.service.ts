@@ -1,6 +1,7 @@
 import type { RedisClientType } from "redis";
 import { createClient } from "redis";
 import { randomUUID } from "crypto";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import logger from "../logger";
 import { initRedis, getRedisClient } from "../redis/client";
 
@@ -140,10 +141,11 @@ export class SemanticCacheService {
      * Retrieve cached response for a semantically similar query
      *
      * @param query - User query string
+     * @param tenantId - Optional tenant ID to isolate cache
      * @param limit - Max number of candidate entries to check (default 100)
      * @returns Cached entry or null
      */
-    public async get(query: string, limit: number = 100): Promise<CacheEntry | null> {
+    public async get(query: string, tenantId?: string, limit: number = 100): Promise<CacheEntry | null> {
         await this.ensureRedis();
         const client = getRedisClient();
 
@@ -154,9 +156,12 @@ export class SemanticCacheService {
         }
 
         try {
+            const indexKeyToUse = tenantId ? `${this.indexKey}:${tenantId}` : this.indexKey;
+            const prefixToUse = tenantId ? `${this.keyPrefix}${tenantId}:` : this.keyPrefix;
+
             // Get recent candidate cache keys from sorted set (most recent first)
             const candidateKeys: string[] = await client.zRevRange(
-                this.indexKey,
+                indexKeyToUse,
                 0,
                 limit - 1
             );
@@ -169,7 +174,7 @@ export class SemanticCacheService {
             // Pipeline to fetch all candidate hashes in one round-trip
             const pipeline = client.multi();
             candidateKeys.forEach((ck) => {
-                pipeline.hGetAll(this.keyPrefix + ck);
+                pipeline.hGetAll(prefixToUse + ck);
             });
 
             const rawResults: any[] = await pipeline.exec() as any[];
@@ -180,7 +185,7 @@ export class SemanticCacheService {
                 const raw = rawResults[i];
                 if (!raw || !raw.embedding) {
                     // Orphaned index entry, clean up
-                    client.zRem(this.indexKey, candidateKeys[i]).catch(() => {});
+                    client.zRem(indexKeyToUse, candidateKeys[i]).catch(() => {});
                     continue;
                 }
 
@@ -235,12 +240,14 @@ export class SemanticCacheService {
      * @param query - Original query
      * @param response - AI response text
      * @param metadata - Additional metadata including tokensUsed, provider, type
+     * @param tenantId - Optional tenant ID for multi-tenant isolation
      * @returns Cache key string
      */
     public async set(
         query: string,
         response: string,
-        metadata: Omit<CacheMetadata, "timestamp">
+        metadata: Omit<CacheMetadata, "timestamp">,
+        tenantId?: string
     ): Promise<string> {
         await this.ensureRedis();
         const client = getRedisClient();
@@ -251,7 +258,9 @@ export class SemanticCacheService {
         }
 
         const cacheKey = randomUUID();
-        const fullKey = this.keyPrefix + cacheKey;
+        const indexKeyToUse = tenantId ? `${this.indexKey}:${tenantId}` : this.indexKey;
+        const prefixToUse = tenantId ? `${this.keyPrefix}${tenantId}:` : this.keyPrefix;
+        const fullKey = prefixToUse + cacheKey;
         const timestamp = Date.now();
         const ttl = TTL_MAP[metadata.type] || TTL_MAP[CacheType.GENERAL];
 
@@ -266,7 +275,7 @@ export class SemanticCacheService {
             type: metadata.type,
         });
         pipeline.expire(fullKey, ttl);
-        pipeline.zAdd(this.indexKey, { score: timestamp, value: cacheKey });
+        pipeline.zAdd(indexKeyToUse, { score: timestamp, value: cacheKey });
         // Optional: set a longer TTL on index key to prune old entries automatically? No per-member TTL.
         await pipeline.exec();
 
