@@ -71,3 +71,6 @@ build-log.txt
 
 # tsc geçici çıktı
 tsc-output.txt
+
+test-output.txt
+build-output.txt
