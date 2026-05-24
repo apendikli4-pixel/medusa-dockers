@@ -105,7 +105,7 @@ export const POST = async (
         }
 
         const { linkCustomerToTenantWorkflow } = await import(
-            "../../../../../workflows/link-entity-to-tenant"
+            "../../../../../workflows/link-entity-to-tenant.js"
         )
 
         const result = await linkCustomerToTenantWorkflow(req.scope).run({

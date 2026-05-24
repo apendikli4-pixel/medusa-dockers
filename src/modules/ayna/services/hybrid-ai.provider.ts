@@ -1,10 +1,9 @@
 // @ts-nocheck
 // TECH-DEBT (v2.13→v2.15 upgrade, 2026-05-24):
 // `Injectable` decorator @medusajs/framework/utils'tan kaldırıldı. V2 modülleri
-// plain class olarak yazılır. Bu dosya çalışıyor ama tip strict mode'da hata
-// veriyor. Refactor: Injectable decorator'ı kaldır + result type assertions ekle.
+// plain class olarak yazılır. Result type assertions hâlâ eklenmeli.
 // Tracking: docs/TECH_DEBT.md
-import { Injectable } from "@medusajs/framework/utils"
+// `Injectable` import'u + decorator çağrısı kaldırıldı — runtime crash önlendi.
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import nodeFetch from "node-fetch"
 import { Logger } from "@medusajs/framework/types"
@@ -49,7 +48,6 @@ export interface AIEmbedOptions {
   input: string | string[]
 }
 
-@Injectable()
 export class HybridAIProviderService {
   protected geminiModel: any
   protected ollamaBaseUrl: string

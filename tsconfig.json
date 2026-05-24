@@ -1,42 +1,42 @@
 {
     "compilerOptions": {
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
-        "target": "ESNext",
-        "lib": [
-            "ES2021",
-            "DOM"
-        ],
-        "sourceMap": true,
-        "outDir": "./dist",
-        "baseUrl": "./",
-        "rootDir": "./",
+        "target": "ES2021",
+        "module": "Node16",
+        "moduleResolution": "Node16",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "allowSyntheticDefaultImports": true,
-        "esModuleInterop": true,
         "resolveJsonModule": true,
+        "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "declaration": false,
+        "sourceMap": false,
+        "inlineSourceMap": true,
+        "outDir": "./.medusa/server",
+        "rootDir": "./",
+        "baseUrl": "./",
         "jsx": "react-jsx",
+        "checkJs": false,
         "strict": true
     },
+    "ts-node": {
+        "swc": true
+    },
     "include": [
-        "src/**/*"
+        "**/*",
+        ".medusa/types/*"
     ],
     "exclude": [
         "node_modules",
         "build",
         "dist",
-        ".medusa",
+        ".medusa/server",
+        ".medusa/admin",
+        ".cache",
         "src/links_backup",
-        "src/scripts/archive"
-    ],
-    "ts-node": {
-        "transpileOnly": true,
-        "files": true,
-        "esm": false,
-        "require": [
-            "tsconfig-paths/register"
-        ]
-    }
+        "src/scripts/archive",
+        "storefront"
+    ]
 }

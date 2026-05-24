@@ -256,7 +256,7 @@ export default class AynaToolService {
             // Tenant bağlama — çakışma düzeltmesi
             if (services.tenantId) {
                 try {
-                    const { linkProductToTenantWorkflow } = await import("../../../workflows/link-entity-to-tenant")
+                    const { linkProductToTenantWorkflow } = await import("../../../workflows/link-entity-to-tenant.js")
                     // Workflow container'ı services'ten alamıyoruz, remoteLink ile bağla
                     const remoteLink = (services as any).remoteLink
                     if (remoteLink) {
@@ -389,7 +389,7 @@ export default class AynaToolService {
      */
     private async executeStoreGenerator(args: Record<string, any>, services: any) {
         try {
-            const { autoStoreGeneratorWorkflow } = await import("../../../workflows/auto-store-generator")
+            const { autoStoreGeneratorWorkflow } = await import("../../../workflows/auto-store-generator.js")
 
             // Not: Workflow container'a ihtiyaç duyar, burada doğrudan çalıştırılamaz.
             // Bu tool admin chat üzerinden çağrılır ve chat route'unda container mevcuttur.

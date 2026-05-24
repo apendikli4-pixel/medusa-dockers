@@ -160,7 +160,7 @@ export const POST = async (
         const data = CreateTenantSchema.parse(req.body)
 
         // ─── Servisi çağır (validasyon + oluşturma) ───
-        const { createTenantWorkflow } = await import("../../../workflows/create-tenant")
+        const { createTenantWorkflow } = await import("../../../workflows/create-tenant.js")
         // Zod nullable() workflow input'undaki optional ile birebir uymadığı için
         // explicit cast — runtime payload aynı, sadece tip kontrolü uyumu.
         const { result } = await createTenantWorkflow(req.scope).run({

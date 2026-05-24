@@ -94,7 +94,7 @@ export default async function orderPlacedHandler({
                     const tenantId = productLinks?.[0]?.tenant?.tenant_id
                     if (tenantId) {
                         const { linkOrderToTenantWorkflow } = await import(
-                            "../workflows/link-entity-to-tenant"
+                            "../workflows/link-entity-to-tenant.js"
                         )
                         await linkOrderToTenantWorkflow(container).run({
                             input: {

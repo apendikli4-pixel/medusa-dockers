@@ -53,7 +53,7 @@ export const POST = async (
     res: MedusaResponse
 ) => {
     try {
-        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as IContentEngineService
+        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as unknown as IContentEngineService
         const logger = req.scope.resolve("logger") as any
 
         const { title, slug, content, image, metadata, status, author, excerpt, seo_title, seo_description } =
@@ -107,7 +107,7 @@ export const GET = async (
     res: MedusaResponse
 ) => {
     try {
-        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as IContentEngineService
+        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as unknown as IContentEngineService
         const parsedQuery = ListPostsQuerySchema.parse(req.query)
 
         const { status } = parsedQuery
@@ -146,7 +146,7 @@ export const PATCH = async (
     res: MedusaResponse
 ) => {
     try {
-        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as IContentEngineService
+        const contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) as unknown as IContentEngineService
         const { id, status, title, content, image, metadata } = UpdatePostSchema.parse(req.body)
 
         // Prepare update data

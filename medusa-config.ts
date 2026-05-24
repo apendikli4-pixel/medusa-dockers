@@ -13,7 +13,7 @@ if (process.env.NODE_ENV === "production") {
     }
 }
 
-module.exports = defineConfig({
+export default defineConfig({
     projectConfig: {
         databaseUrl: process.env.DATABASE_URL,
         // ─── Redis HA Yapılandırması ───

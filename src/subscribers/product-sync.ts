@@ -1,5 +1,6 @@
 import { Modules } from "@medusajs/framework/utils"
-import { MeiliSearch } from "meilisearch"
+// meilisearch v0.55+ ESM-only; CommonJS scope için dynamic import zorunlu.
+// Tip gerekirse ts 5.4+ ile { with: { "resolution-mode": "import" } } eklenebilir.
 
 export default async function productSync({
     event: { data, name },
@@ -8,6 +9,7 @@ export default async function productSync({
     const productService = container.resolve(Modules.PRODUCT)
     const logger = container.resolve("logger")
 
+    const { MeiliSearch } = await import("meilisearch")
     const client = new MeiliSearch({
         host: process.env.MEILISEARCH_HOST || "http://localhost:7700",
         apiKey: process.env.MEILISEARCH_MASTER_KEY || "masterKey123",
