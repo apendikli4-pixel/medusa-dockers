@@ -1,7 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { applyRateLimit, CONTENT_LIMITER } from "../../../lib/rate-limiter"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const GenerateContentSchema = z.object({
     prompt: z.string().min(1).max(4000),
@@ -40,7 +40,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

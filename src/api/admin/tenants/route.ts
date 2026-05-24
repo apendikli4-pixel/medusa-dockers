@@ -13,7 +13,7 @@
  * - Hata detayları logger ile sunucu tarafında loglanır
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 import { TENANT_MODULE } from "../../../modules/tenant"
 import type TenantService from "../../../modules/tenant/service"
 
@@ -43,11 +43,16 @@ const CreateTenantSchema = z.object({
         .min(1, "Slug zorunludur.")
         .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug sadece küçük harf, rakam ve tire (-) içerebilir."),
     sector: SectorSchema,
-    settings: z.record(z.unknown()).optional().nullable(),
+    // createTenantProvisioningWorkflow tarafından zorunlu — yeni mağaza yönetici hesabı
+    admin_email: z.string().min(3, "Yönetici e-postası zorunludur."),
+    admin_password: z.string().min(8, "Yönetici şifresi en az 8 karakter olmalıdır."),
+    admin_first_name: z.string().optional(),
+    admin_last_name: z.string().optional(),
+    settings: z.record(z.string(), z.unknown()).optional().nullable(),
     features: z.array(FeatureSchema).optional(),
     owner_id: z.string().optional().nullable(),
     domain: z.string().optional().nullable(),
-    metadata: z.record(z.unknown()).optional().nullable(),
+    metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 /**
@@ -114,7 +119,7 @@ export const GET = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz sorgu parametreleri.",
-                details: error.errors,
+                details: error.issues,
             })
         }
 
@@ -156,8 +161,14 @@ export const POST = async (
 
         // ─── Servisi çağır (validasyon + oluşturma) ───
         const { createTenantWorkflow } = await import("../../../workflows/create-tenant")
+        // Zod nullable() workflow input'undaki optional ile birebir uymadığı için
+        // explicit cast — runtime payload aynı, sadece tip kontrolü uyumu.
         const { result } = await createTenantWorkflow(req.scope).run({
-            input: data,
+            input: {
+                ...data,
+                domain: data.domain ?? undefined,
+                settings: data.settings ?? undefined,
+            },
         })
 
         return res.status(201).json({
@@ -171,7 +182,7 @@ export const POST = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek verisi.",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

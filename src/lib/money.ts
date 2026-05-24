@@ -24,6 +24,7 @@
  */
 
 import { BigNumber } from "@medusajs/framework/utils"
+import type { BigNumberInput } from "@medusajs/framework/types"
 
 /**
  * Para alanları için kabul edilen giriş tipi.
@@ -42,6 +43,7 @@ export type MoneyInput =
     | string
     | bigint
     | BigNumber
+    | BigNumberInput            // Medusa V2 entity money fields (order.total, vb.)
     | { value: string | number }
     | null
     | undefined

@@ -8,7 +8,7 @@
  * Validation: Zod
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 import { TENANT_MODULE } from "../../../../../modules/tenant"
 import type TenantService from "../../../../../modules/tenant/service"
 
@@ -74,7 +74,7 @@ export const GET = async (
     } catch (error: unknown) {
         const logger = req.scope.resolve("logger") as any
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Geçersiz sorgu.", details: error.errors })
+            return res.status(400).json({ error: "Geçersiz sorgu.", details: error.issues })
         }
         logger.error(`[Tenant Customers] Listeleme hatası: ${error instanceof Error ? error.message : "Bilinmeyen"}`)
         return res.status(500).json({ error: "Mağaza müşterileri listelenirken hata oluştu." })
@@ -123,7 +123,7 @@ export const POST = async (
     } catch (error: unknown) {
         const logger = req.scope.resolve("logger") as any
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Geçersiz istek.", details: error.errors })
+            return res.status(400).json({ error: "Geçersiz istek.", details: error.issues })
         }
         logger.error(`[Tenant Customers] Bağlama hatası: ${error instanceof Error ? error.message : "Bilinmeyen"}`)
         return res.status(500).json({ error: "Müşteri mağazaya bağlanırken hata oluştu." })

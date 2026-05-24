@@ -16,7 +16,7 @@
  * x-publishable-api-key zorunlu (Medusa store convention)
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const ListQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(100).optional().default(20),
@@ -145,7 +145,7 @@ export const GET = async (
     } catch (error: unknown) {
         const logger = req.scope.resolve("logger") as any
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Geçersiz sorgu.", details: error.errors })
+            return res.status(400).json({ error: "Geçersiz sorgu.", details: error.issues })
         }
         logger.error(`[Store Tenant Products] Hata: ${error instanceof Error ? error.message : "Bilinmeyen"}`)
         return res.status(500).json({ error: "Ürünler listelenirken hata oluştu." })

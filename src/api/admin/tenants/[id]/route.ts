@@ -11,7 +11,7 @@
  * sunucu detayları (stack trace vb.) istemciye gösterilmez.
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 import { TENANT_MODULE } from "../../../../modules/tenant"
 import type TenantService from "../../../../modules/tenant/service"
 
@@ -34,12 +34,12 @@ const UpdateTenantSchema = z.object({
         .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug sadece küçük harf, rakam ve tire (-) içerebilir.")
         .optional(),
     sector: SectorSchema.optional(),
-    settings: z.record(z.unknown()).optional().nullable(),
+    settings: z.record(z.string(), z.unknown()).optional().nullable(),
     features: z.array(FeatureSchema).optional(),
     is_active: z.boolean().optional(),
     owner_id: z.string().optional().nullable(),
     domain: z.string().optional().nullable(),
-    metadata: z.record(z.unknown()).optional().nullable(),
+    metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 // ─── GET /admin/tenants/:id — Mağaza Detayı ───
@@ -135,7 +135,7 @@ export const POST = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz güncelleme verisi.",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

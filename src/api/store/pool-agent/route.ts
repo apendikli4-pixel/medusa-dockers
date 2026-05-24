@@ -1,5 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 import { applyRateLimit, createRateLimiter } from "../../../lib/rate-limiter"
 
 const STORE_AI_LIMITER = createRateLimiter({
@@ -27,7 +27,7 @@ const PoolAgentRequestSchema = z.object({
  * Havuz Mühendisi Ajanı — Müşteriden ölçü alıp kimyasal hesaplama yapar
  */
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
-    if (applyRateLimit(req, res, STORE_AI_LIMITER)) {
+    if (await applyRateLimit(req, res, STORE_AI_LIMITER)) {
         return
     }
 
@@ -56,7 +56,7 @@ Müşteri mesajı: ${message}`
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

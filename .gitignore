@@ -68,3 +68,6 @@ build-log.txt
 
 # Inner project skeletons (yanlislikla nested olmasin)
 /mirror-core-genesis/
+
+# tsc geçici çıktı
+tsc-output.txt

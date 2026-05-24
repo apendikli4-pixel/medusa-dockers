@@ -1,7 +1,6 @@
 import { Module } from "@medusajs/framework/utils"
 import AynaService from "./service"
 import HybridAIProviderService from "./services/hybrid-ai.provider"
-import InjectionDetectorService from "./services/injection-detector.service"
 import {
     MemoryTruth,
     MemoryInsight,
@@ -11,19 +10,14 @@ import { Mission } from "./models/mission"
 
 export const AYNA_MODULE = "ayna"
 
+/**
+ * NOT: InjectionDetectorService henüz implemente edilmedi. Prompt-security
+ * middleware'ı geçici olarak no-op (her isteği geçirir). Gerçek detector
+ * eklendiğinde buradan re-register edilecek.
+ * @see src/api/middlewares/prompt-security.ts
+ */
 export default Module(AYNA_MODULE, {
     service: AynaService,
-    // Register additional services that can be injected
-    services: [
-        {
-            name: "hybridAIProvider",
-            service: HybridAIProviderService
-        },
-        {
-            name: "injectionDetectorService",
-            service: InjectionDetectorService
-        }
-    ]
 })
 
-export { AynaService, HybridAIProviderService, InjectionDetectorService }
+export { AynaService, HybridAIProviderService }

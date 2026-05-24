@@ -36,7 +36,7 @@ import type {
     EventSubscriber,
     TransactionEventArgs,
 } from "@mikro-orm/core"
-import { getTenantId } from "../../lib/tenant-context-store"
+import { getTenantId } from "../../../lib/tenant-context-store"
 
 /**
  * Sistem işlemleri için kullanılan özel tenant ID.

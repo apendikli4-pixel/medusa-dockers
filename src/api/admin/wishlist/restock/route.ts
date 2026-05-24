@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const RestockNotifySchema = z.object({
     product_id: z.string().min(1),
@@ -37,7 +37,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         if (error?.name === "ZodError") {
             return res.status(400).json({
                 error: "Invalid request",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

@@ -34,4 +34,7 @@ export abstract class BaseShippingProvider extends AbstractFulfillmentProviderSe
 
     /**
      * Ortak loglama ve hata yönetimi buraya eklenebilir.
+     * Şu an placeholder — concrete provider'lar (yurtici, vs.) kendi
+     * trackShipment / cancelShipment metodlarını burada genişletir.
      */
+}

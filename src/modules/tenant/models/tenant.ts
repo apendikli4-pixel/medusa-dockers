@@ -71,7 +71,9 @@ export const Tenant = model.define("tenant", {
      * NOT: Medusa v2 DML'de native string array yoktur.
      * JSON olarak saklanıp, servis katmanında string[] olarak okunur.
      */
-    features: model.json().default("[]"),
+    // V2.15: model.json() default'u Record<string, unknown> bekler; array değer
+    // için varsayılan vermek yerine null bırakıyoruz, servis katmanı [] olarak yorumlar.
+    features: model.json().nullable(),
 
     /**
      * Mağaza aktif mi?
@@ -85,7 +87,7 @@ export const Tenant = model.define("tenant", {
      * Medusa'nın kendi auth_user tablosundaki ID ile eşleşir.
      * Bu alan üzerinden "bu tenant kime ait?" sorusuna cevap verilir.
      */
-    owner_id: model.text().nullable().index(),
+    owner_id: model.text().nullable(), // index Migration20260513120000.ts içinde ayrıca tanımlı
 
     /**
      * Opsiyonel özel alan adı.

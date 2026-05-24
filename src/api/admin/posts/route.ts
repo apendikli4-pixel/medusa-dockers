@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MODULES, IContentEngineService, CreatePostInput, UpdatePostInput, ListPostsFilters } from "../../../types/index"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const PostStatusSchema = z.enum(["draft", "published", "archived"])
 
@@ -9,7 +9,7 @@ const CreatePostSchema = z.object({
     slug: z.string().min(1),
     content: z.string().min(1),
     image: z.string().optional().nullable(),
-    metadata: z.record(z.unknown()).optional().nullable(),
+    metadata: z.record(z.string(), z.unknown()).optional().nullable(),
     status: PostStatusSchema.optional(),
     author: z.string().optional().nullable(),
     excerpt: z.string().optional().nullable(),
@@ -27,7 +27,7 @@ const UpdatePostSchema = z.object({
     title: z.string().optional(),
     content: z.string().optional(),
     image: z.string().optional().nullable(),
-    metadata: z.record(z.unknown()).optional().nullable(),
+    metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 function isDuplicateError(error: unknown): boolean {
@@ -83,7 +83,7 @@ export const POST = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 
@@ -129,7 +129,7 @@ export const GET = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 
@@ -177,7 +177,7 @@ export const PATCH = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

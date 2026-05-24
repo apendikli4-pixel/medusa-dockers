@@ -1,14 +1,14 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
 import AynaService from "../../../modules/ayna/service"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const CreateMissionSchema = z.object({
     title: z.string().min(1),
     description: z.string().optional(),
     status: z.enum(["pending", "in_progress", "completed", "failed"]).optional(),
     priority: z.enum(["low", "medium", "high", "critical"]).optional(),
-    result: z.record(z.unknown()).nullable().optional(),
+    result: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
 const UpdateMissionSchema = z.object({
@@ -89,7 +89,7 @@ export const POST = async (
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

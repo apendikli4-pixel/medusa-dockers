@@ -31,7 +31,7 @@ export default async function tenantRlsSubscriberLoader(
         )
 
         // EventManager'a subscriber kaydı
-        const eventManager = manager.getEventManager()
+        const eventManager = (manager as any).getEventManager()
         eventManager.registerSubscriber(new TenantRlsSubscriber())
     } catch (error: unknown) {
         // Subscriber kayıt hatası — kritik ama uygulama başlatmayı

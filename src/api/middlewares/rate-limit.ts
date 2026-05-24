@@ -4,10 +4,17 @@
  * Supports per-endpoint rate limits with Redis-backed storage
  */
 
-import type { Middleware } from "@medusajs/framework/types";
-import { applyRateLimit } from "../../../lib/rate-limiter";
-import { RATE_LIMITS } from "../../../config/rate-limits";
-import logger from "../../../lib/logger";
+import type { MedusaNextFunction, MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import { applyRateLimit } from "../../lib/rate-limiter";
+import { RATE_LIMITS } from "../../config/rate-limits";
+import logger from "../../lib/logger";
+
+/**
+ * Medusa V2.15: `Middleware` tipi @medusajs/framework/types'tan kaldırıldı.
+ * Yeni yaklaşım: handler fonksiyon imzası direkt MedusaRequest/Response/Next
+ * parametreleri alır.
+ */
+type Middleware = (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => void | Promise<void>
 
 /**
  * Creates a rate limit middleware for a specific endpoint group

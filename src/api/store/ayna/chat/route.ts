@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 import { createRateLimiter, applyRateLimit } from "../../../../lib/rate-limiter"
 import { RATE_LIMITS } from "../../../../config/rate-limits"
 
@@ -74,7 +74,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         if (error instanceof z.ZodError || error.name === "ZodError") {
             return res.status(400).json({
                 error: "Geçersiz istek",
-                details: error.errors,
+                details: error.issues,
             })
         }
 

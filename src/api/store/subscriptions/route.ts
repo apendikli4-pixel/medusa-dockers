@@ -1,5 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const CreateSubscriptionSchema = z.object({
     product_id: z.string().min(1),
@@ -34,7 +34,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     if (!customerId) return res.status(401).json({ error: "Giriş yapmanız gerekiyor." })
 
     const parsed = CreateSubscriptionSchema.safeParse(req.body)
-    if (!parsed.success) return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.errors })
+    if (!parsed.success) return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.issues })
 
     try {
         const subscriptionService = req.scope.resolve("subscription") as any

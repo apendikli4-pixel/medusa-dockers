@@ -1,5 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const RedeemSchema = z.object({
     points: z.number().int().min(500, "Minimum 500 puan"),
@@ -33,7 +33,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     if (!customerId) return res.status(401).json({ error: "Giriş yapmanız gerekiyor." })
 
     const parsed = RedeemSchema.safeParse(req.body)
-    if (!parsed.success) return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.errors })
+    if (!parsed.success) return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.issues })
 
     try {
         const loyaltyService = req.scope.resolve("loyalty") as any

@@ -93,7 +93,9 @@ export function getTenantStore(): TenantStore | undefined {
  *
  * Kullanım:
  *   const tenantId = getTenantId()
- *   if (!tenantId) { /* system context */ }
+ *   if (!tenantId) {
+ *     // system context (cron job, worker, vb.)
+ *   }
  *
  * @returns tenant_id string veya undefined
  */

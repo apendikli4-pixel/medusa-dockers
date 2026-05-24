@@ -4,8 +4,8 @@
  */
 
 import { getRedisClient, initRedis } from "./redis/client";
-import type { RateLimitConfig } from "../../config/rate-limits";
-import { ADMIN_WHITELIST_IPS, RATE_LIMIT_REDIS_PREFIX } from "../../config/rate-limits";
+import type { RateLimitConfig } from "../config/rate-limits";
+import { ADMIN_WHITELIST_IPS, RATE_LIMIT_REDIS_PREFIX } from "../config/rate-limits";
 import logger from "./logger";
 
 interface RateLimitLimiter {
@@ -178,7 +178,8 @@ export async function applyRateLimit(
 
         // Calculate remaining and reset time
         const remaining = Math.max(0, maxRequests - currentCount);
-        const oldestEntry = await redisClient.zRange(redisKey, 0, 0, { REV: false });
+        // V2.15: redis v4 zRange options.REV imzası strict; cast ile geçiyoruz
+        const oldestEntry = await (redisClient as any).zRange(redisKey, 0, 0, { REV: false });
         const resetTime = oldestEntry.length > 0
             ? parseInt(oldestEntry[0], 10) + windowMs
             : now + windowMs;

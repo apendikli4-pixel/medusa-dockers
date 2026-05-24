@@ -1,5 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { z } from "zod"
+import { z } from "@medusajs/framework/zod"
 
 const AddWishlistSchema = z.object({
     product_id: z.string().min(1, "product_id gerekli"),
@@ -41,7 +41,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
         const parsed = AddWishlistSchema.safeParse(req.body)
         if (!parsed.success) {
-            return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.errors })
+            return res.status(400).json({ error: "Geçersiz istek.", details: parsed.error.issues })
         }
 
         const wishlistService = req.scope.resolve("wishlist") as any

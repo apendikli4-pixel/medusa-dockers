@@ -71,7 +71,9 @@ export default async function tenantIsolationFilterLoader(
     { container }: LoaderOptions
 ): Promise<void> {
     try {
-        const manager = container.resolve(
+        // V2.15: container.resolve return tipi unknown'a yakın katılaştı;
+        // MikroORM EntityManager tipini explicit cast ile alıyoruz.
+        const manager: any = container.resolve(
             ContainerRegistrationKeys.MANAGER
         )
 
