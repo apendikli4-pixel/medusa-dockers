@@ -63,17 +63,20 @@ export function toBig(input: MoneyInput): BigNumber {
     if (input === null || input === undefined) {
         return new BigNumber(0)
     }
-    if (input instanceof BigNumber) {
+    // Defensive: bazı test ortamlarında @medusajs/framework/utils mock'lanır
+    // ve BigNumber undefined olabilir. `instanceof undefined` runtime hatası
+    // yerine typeof guard ile güvenli kontrol.
+    if (typeof BigNumber === "function" && input instanceof BigNumber) {
         return input
     }
     // BigNumberRawValue formatı: { value: "..." }
     if (typeof input === "object" && input !== null && "value" in input) {
-        return new BigNumber(input.value)
+        return new BigNumber((input as { value: string | number }).value)
     }
     if (typeof input === "bigint") {
         return new BigNumber(input.toString())
     }
-    return new BigNumber(input)
+    return new BigNumber(input as number | string)
 }
 
 /**

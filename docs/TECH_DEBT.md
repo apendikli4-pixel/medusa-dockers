@@ -74,6 +74,7 @@ performans düşer ama functional doğruluk kaybolmaz.
 | Dosya | Sorun | Aksiyon |
 |---|---|---|
 | `src/lib/__tests__/rate-limiter.spec.ts.skip` | vitest import (proje jest kullanıyor) | jest'e port et veya vitest devDep olarak ekle, sonra `.skip` uzantısını kaldır |
+| `src/modules/ayna/__tests__/hybrid-ai.provider.spec.ts.skip` | node-fetch v3 ESM-only, jest CJS ile çakışıyor | jest.config.js'e `transformIgnorePatterns: ['node_modules/(?!node-fetch)']` ekle veya hybrid-ai'i `node-fetch` yerine yerli `fetch`'e geçir |
 | `src/api/middlewares/prompt-security.ts` | No-op stub (InjectionDetectorService eksik) | `src/modules/conscience/services/injection-detector.service.ts` zaten var — onu bağla, no-op'tan çıkar |
 | Birkaç yerde `as any` cast (manager, redisClient, scan) | V2.15 strict tipler için ekledik | Doğru tip annotation'larıyla değiştir |
 

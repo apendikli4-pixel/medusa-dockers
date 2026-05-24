@@ -1,0 +1,283 @@
+
+> aqua-havuz-genesis@0.0.1 test
+> jest
+
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in C:/Users/AynaG/Desktop/PROJECT-AYNA-GENESIS-push-20260402/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in C:/Users/AynaG/Desktop/PROJECT-AYNA-GENESIS-push-20260402/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in C:/Users/AynaG/Desktop/PROJECT-AYNA-GENESIS-push-20260402/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+FAIL src/lib/__tests__/yurtici-mock-preservation.spec.ts
+  ● Yurtiçi Kargo — Mevcut Kod Baseline Davranışı (USE_MOCK_PROVIDERS Kontrolü Yok) › USE_MOCK_PROVIDERS=true ile createFulfillment çağrısı bir sonuç döndürür (baseline)
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — Mevcut Kod Baseline Davranışı (USE_MOCK_PROVIDERS Kontrolü Yok) › USE_MOCK_PROVIDERS=true ile createFulfillment tracking_number içerir (baseline)
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — Mevcut Kod Baseline Davranışı (USE_MOCK_PROVIDERS Kontrolü Yok) › USE_MOCK_PROVIDERS=true ile createFulfillment shipping_data içerir (baseline)
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — USE_MOCK_PROVIDERS=true Koruma Testleri (Requirements 3.3) › USE_MOCK_PROVIDERS=true modunda createFulfillment başarıyla tamamlanır
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:109:15)
+
+  ● Yurtiçi Kargo — USE_MOCK_PROVIDERS=true Koruma Testleri (Requirements 3.3) › USE_MOCK_PROVIDERS=true modunda API anahtarı olmadan sistem hata fırlatmaz
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:109:15)
+
+  ● Yurtiçi Kargo — USE_MOCK_PROVIDERS=true Koruma Testleri (Requirements 3.3) › USE_MOCK_PROVIDERS=true modunda getFulfillmentOptions çalışmaya devam eder
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:109:15)
+
+  ● Yurtiçi Kargo — USE_MOCK_PROVIDERS=true Koruma Testleri (Requirements 3.3) › USE_MOCK_PROVIDERS=true modunda cancelFulfillment çalışmaya devam eder
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:109:15)
+
+  ● Yurtiçi Kargo — USE_MOCK_PROVIDERS=true Koruma Testleri (Requirements 3.3) › USE_MOCK_PROVIDERS=true modunda validateFulfillmentData çalışmaya devam eder
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-mock-preservation.spec.ts:109:15)
+
+FAIL src/lib/__tests__/yurtici-fake-tracking.exploration.spec.ts
+  ● Yurtiçi Kargo — Sahte Takip Numarası Keşif Testi › USE_MOCK_PROVIDERS tanımlı değilken createFulfillment Math.random() ile sahte numara üretmemeli
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-fake-tracking.exploration.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — Sahte Takip Numarası Keşif Testi › createFulfillment sonucu gerçek API kaydına karşılık gelen bir takip numarası içermeli
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-fake-tracking.exploration.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — Sahte Takip Numarası Keşif Testi › API anahtarı eksikken createFulfillment hata fırlatmalı, sahte numara üretmemeli
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-fake-tracking.exploration.spec.ts:40:15)
+
+  ● Yurtiçi Kargo — Sahte Takip Numarası Keşif Testi › aynı sipariş için birden fazla çağrıda farklı takip numaraları üretilmemeli
+
+    TypeError: Cannot read properties of undefined (reading 'logger')
+
+       9 |
+      10 |   constructor(container: any, options: T) {
+    > 11 |     this.logger_ = container.logger || {
+         |                              ^
+      12 |       info: () => {},
+      13 |       warn: () => {},
+      14 |       error: () => {},
+
+      at new AbstractFulfillmentProviderService (src/modules/ayna/__tests__/__mocks__/medusa-utils.ts:11:30)
+      at new BaseShippingProvider (src/providers/base-shipping-provider.ts:12:9)
+      at new YurticiProviderService (src/providers/yurtici/service.ts:22:9)
+      at Object.<anonymous> (src/lib/__tests__/yurtici-fake-tracking.exploration.spec.ts:40:15)
+
+FAIL src/modules/ayna/__tests__/hybrid-ai.provider.spec.ts
+  ● Test suite failed to run
+
+    Jest encountered an unexpected token
+
+    Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+
+    Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+
+    By default "node_modules" folder is ignored by transformers.
+
+    Here's what you can do:
+     • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+     • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+     • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+     • If you need a custom transformation, specify a "transform" option in your config.
+     • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+
+    You'll find more details and examples of these config options in the docs:
+    https://jestjs.io/docs/configuration
+    For information about custom transformations, see:
+    https://jestjs.io/docs/code-transformation
+
+    Details:
+
+    C:\Users\AynaG\Desktop\PROJECT-AYNA-GENESIS-push-20260402\node_modules\node-fetch\src\index.js:9
+    import http from 'node:http';
+    ^^^^^^
+
+    SyntaxError: Cannot use import statement outside a module
+
+       7 | import { Injectable } from "@medusajs/framework/utils"
+       8 | import { GoogleGenerativeAI } from "@google/generative-ai"
+    >  9 | import nodeFetch from "node-fetch"
+         | ^
+      10 | import { Logger } from "@medusajs/framework/types"
+      11 |
+      12 | /**
+
+      at ModuleExecutor.compile (node_modules/jest-runtime/build/index.js:2104:44)
+      at Object.<anonymous> (src/modules/ayna/services/hybrid-ai.provider.ts:9:1)
+      at Object.<anonymous> (src/modules/ayna/__tests__/hybrid-ai.provider.spec.ts:1:1)
+
+
+Test Suites: 3 failed, 10 passed, 13 total
+Tests:       12 failed, 2 skipped, 98 passed, 112 total
+Snapshots:   0 total
+Time:        9.027 s
+Ran all test suites.
