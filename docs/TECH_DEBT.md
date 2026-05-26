@@ -1,6 +1,8 @@
 # Technical Debt — v2.13 → v2.15 Yükseltme Sonrası
 
-**Son güncelleme:** 2026-05-24
+**Son güncelleme:** 2026-05-27 — Tüm `@ts-nocheck` direktifleri kaldırıldı,
+2 skipped test aktifleştirildi, prompt-security middleware gerçek implementasyonla
+bağlandı. Faz 9 (Tech Debt) kapatıldı.
 
 v2.13.4 → v2.15.3 yükseltmesi sırasında, baseline'ı yeşillendirmek için 3 dosyada
 geçici `@ts-nocheck` direktifi konuldu. Bu dosyalar **runtime'da çalışıyor** —

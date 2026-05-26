@@ -69,8 +69,10 @@ build-log.txt
 # Inner project skeletons (yanlislikla nested olmasin)
 /mirror-core-genesis/
 
-# tsc geçici çıktı
+# tsc / docker compose / build geçici çıktıları
 tsc-output.txt
+compose-output.txt
+build-output.txt
 
 test-output.txt
 build-output.txt
