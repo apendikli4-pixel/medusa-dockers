@@ -93,17 +93,9 @@ services:
     image: redis:7-alpine
     container_name: medusa_sentinel_1
     restart: unless-stopped
-    command: >
-      sh -c '
-      cat > /tmp/sentinel.conf << EOF
-      port 26379
-      sentinel monitor medusa-master redis-master 6379 2
-      sentinel auth-pass medusa-master R3d1sSecurePass2026
-      sentinel down-after-milliseconds medusa-master 5000
-      sentinel failover-timeout medusa-master 10000
-      sentinel parallel-syncs medusa-master 1
-      EOF
-      redis-sentinel /tmp/sentinel.conf'
+    volumes:
+      - ./docker/sentinel.conf:/etc/redis/sentinel.conf:ro
+    command: sh -c "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     expose:
       - "26379"
     depends_on:
@@ -119,17 +111,9 @@ services:
     image: redis:7-alpine
     container_name: medusa_sentinel_2
     restart: unless-stopped
-    command: >
-      sh -c '
-      cat > /tmp/sentinel.conf << EOF
-      port 26379
-      sentinel monitor medusa-master redis-master 6379 2
-      sentinel auth-pass medusa-master R3d1sSecurePass2026
-      sentinel down-after-milliseconds medusa-master 5000
-      sentinel failover-timeout medusa-master 10000
-      sentinel parallel-syncs medusa-master 1
-      EOF
-      redis-sentinel /tmp/sentinel.conf'
+    volumes:
+      - ./docker/sentinel.conf:/etc/redis/sentinel.conf:ro
+    command: sh -c "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     expose:
       - "26379"
     depends_on:
@@ -145,17 +129,9 @@ services:
     image: redis:7-alpine
     container_name: medusa_sentinel_3
     restart: unless-stopped
-    command: >
-      sh -c '
-      cat > /tmp/sentinel.conf << EOF
-      port 26379
-      sentinel monitor medusa-master redis-master 6379 2
-      sentinel auth-pass medusa-master R3d1sSecurePass2026
-      sentinel down-after-milliseconds medusa-master 5000
-      sentinel failover-timeout medusa-master 10000
-      sentinel parallel-syncs medusa-master 1
-      EOF
-      redis-sentinel /tmp/sentinel.conf'
+    volumes:
+      - ./docker/sentinel.conf:/etc/redis/sentinel.conf:ro
+    command: sh -c "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     expose:
       - "26379"
     depends_on:
