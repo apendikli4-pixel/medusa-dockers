@@ -1,11 +1,3 @@
-// @ts-nocheck
-// TECH-DEBT (v2.13→v2.15 upgrade, 2026-05-24):
-// Medusa V2.15 Workflow SDK tip imzaları değişti:
-//   - CompensateFn parametre tipi (input, { container }) -> (input, context)
-//   - step.config() artık parametre kabul etmiyor
-//   - WorkflowData<T> .id/.token direkt property erişimi yerine transform/run kullan
-// Runtime davranışı korunuyor — tip uyumluluğu için kademeli refactor planlanıyor.
-// Tracking issue: docs/TECH_DEBT.md
 /**
  * Tenant Provisioning Workflow — Mağaza Otonom Kurulum Hattı
  * ═══════════════════════════════════════════════════════════════
@@ -53,6 +45,7 @@ import {
     createStep,
     StepResponse,
     WorkflowResponse,
+    transform,
 } from "@medusajs/framework/workflows-sdk"
 import { Modules } from "@medusajs/framework/utils"
 import { TENANT_MODULE } from "../modules/tenant"
@@ -129,7 +122,7 @@ const createTenantRecordStep = createStep(
         return new StepResponse(result.data, result.data.id)
     },
     // ─── COMPENSATION: Tenant kaydını sil ───
-    async (tenantId: string, { container }) => {
+    async (tenantId: string | undefined, { container }) => {
         if (!tenantId) return
         const tenantService = container.resolve(TENANT_MODULE) as any
         const logger = container.resolve("logger") as any
@@ -163,7 +156,7 @@ const createSalesChannelStep = createStep(
         return new StepResponse(channel, channel.id)
     },
     // ─── COMPENSATION: Sales Channel'ı sil ───
-    async (channelId: string, { container }) => {
+    async (channelId: string | undefined, { container }) => {
         if (!channelId) return
         const salesChannelService = container.resolve(Modules.SALES_CHANNEL) as any
         const logger = container.resolve("logger") as any
@@ -195,7 +188,7 @@ const createStockLocationStep = createStep(
         return new StepResponse(location, location.id)
     },
     // ─── COMPENSATION: Stock Location'ı sil ───
-    async (locationId: string, { container }) => {
+    async (locationId: string | undefined, { container }) => {
         if (!locationId) return
         const stockLocationService = container.resolve(Modules.STOCK_LOCATION) as any
         const logger = container.resolve("logger") as any
@@ -229,7 +222,7 @@ const createPublishableKeyStep = createStep(
         return new StepResponse(key, key.id)
     },
     // ─── COMPENSATION: API Key'i sil ───
-    async (keyId: string, { container }) => {
+    async (keyId: string | undefined, { container }) => {
         if (!keyId) return
         const apiKeyService = container.resolve(Modules.API_KEY) as any
         const logger = container.resolve("logger") as any
@@ -301,7 +294,7 @@ const createTenantAdminStep = createStep(
         })
     },
     // ─── COMPENSATION: Auth Identity + User kaydını sil ───
-    async (ids: { user_id: string; auth_identity_id: string }, { container }) => {
+    async (ids: { user_id: string; auth_identity_id: string } | undefined, { container }) => {
         if (!ids) return
         const authModuleService = container.resolve(Modules.AUTH) as any
         const userModuleService = container.resolve(Modules.USER) as any
@@ -443,48 +436,59 @@ export const createTenantProvisioningWorkflow = createWorkflow(
         // Adım 1: Tenant kaydı
         const tenant = createTenantRecordStep(input)
 
-        // Adım 2: Sales Channel (izolasyon anahtarı)
-        const salesChannel = createSalesChannelStep({
-            name: `${input.name} — Sales Channel`,
-            description: `İzole satış kanalı: ${input.name} (${input.slug})`,
-        })
+        // V2.15: workflow data property erişimi için transform() gerekiyor.
+        // Önceki step çıktısının primitive alanlarını projeksiyonla alıyoruz.
+        const scInput = transform({ input }, (data) => ({
+            name: `${data.input.name} — Sales Channel`,
+            description: `İzole satış kanalı: ${data.input.name} (${data.input.slug})`,
+        }))
+        const salesChannel = createSalesChannelStep(scInput)
 
-        // Adım 3: Stock Location (varsayılan depo)
-        const stockLocation = createStockLocationStep({
-            name: `${input.name} — Ana Depo`,
-        })
+        const slInput = transform({ input }, (data) => ({
+            name: `${data.input.name} — Ana Depo`,
+        }))
+        const stockLocation = createStockLocationStep(slInput)
 
-        // Adım 4: Publishable API Key
-        const apiKey = createPublishableKeyStep({
-            title: `${input.name} — Storefront Key`,
-        })
+        const keyInput = transform({ input }, (data) => ({
+            title: `${data.input.name} — Storefront Key`,
+        }))
+        const apiKey = createPublishableKeyStep(keyInput)
 
-        // Adım 5: Admin User (Auth Identity + User)
-        const adminUser = createTenantAdminStep({
-            email: input.admin_email,
-            password: input.admin_password,
-            first_name: input.admin_first_name ?? "Admin",
-            last_name: input.admin_last_name ?? "",
-            tenant_id: tenant.id,
-        })
+        // Adım 5: Admin User — tenant.id'yi transform ile çek
+        const adminInput = transform({ input, tenant }, (data) => ({
+            email: data.input.admin_email,
+            password: data.input.admin_password,
+            first_name: data.input.admin_first_name ?? "Admin",
+            last_name: data.input.admin_last_name ?? "",
+            tenant_id: (data.tenant as { id: string }).id,
+        }))
+        const adminUser = createTenantAdminStep(adminInput)
 
         // Adım 6: Tüm kaynakları bağla
-        linkTenantResourcesStep({
-            tenantId: tenant.id,
-            salesChannelId: salesChannel.id,
-            stockLocationId: stockLocation.id,
-            apiKeyId: apiKey.id,
-        })
+        const linkInput = transform(
+            { tenant, salesChannel, stockLocation, apiKey },
+            (data) => ({
+                tenantId: (data.tenant as { id: string }).id,
+                salesChannelId: (data.salesChannel as { id: string }).id,
+                stockLocationId: (data.stockLocation as { id: string }).id,
+                apiKeyId: (data.apiKey as { id: string }).id,
+            })
+        )
+        linkTenantResourcesStep(linkInput)
 
         // ─── WORKFLOW SONUCU ───
-        return new WorkflowResponse({
-            tenant_id: tenant.id,
-            sales_channel_id: salesChannel.id,
-            stock_location_id: stockLocation.id,
-            api_key_id: apiKey.id,
-            api_key_token: apiKey.token,
-            admin_user_id: adminUser.id,
-        })
+        const result = transform(
+            { tenant, salesChannel, stockLocation, apiKey, adminUser },
+            (data) => ({
+                tenant_id: (data.tenant as { id: string }).id,
+                sales_channel_id: (data.salesChannel as { id: string }).id,
+                stock_location_id: (data.stockLocation as { id: string }).id,
+                api_key_id: (data.apiKey as { id: string }).id,
+                api_key_token: (data.apiKey as { token: string }).token,
+                admin_user_id: (data.adminUser as { id: string }).id,
+            })
+        )
+        return new WorkflowResponse(result)
     }
 )
 

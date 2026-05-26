@@ -1,10 +1,3 @@
-// @ts-nocheck
-// TECH-DEBT (v2.13→v2.15 upgrade, 2026-05-24):
-// redis npm paketi v4 API değişti — zRevRange, zRange, scan signature'ları farklı.
-// Modernize edilmesi gerek; runtime çalışıyor (yeni tipler katılaşmış).
-// Tracking: docs/TECH_DEBT.md
-import type { RedisClientType } from "redis";
-import { createClient } from "redis";
 import { randomUUID } from "crypto";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import logger from "../logger";
@@ -165,10 +158,12 @@ export class SemanticCacheService {
             const prefixToUse = tenantId ? `${this.keyPrefix}${tenantId}:` : this.keyPrefix;
 
             // Get recent candidate cache keys from sorted set (most recent first)
-            const candidateKeys: string[] = await client.zRevRange(
+            // redis v4: zRange with REV:true replaces deprecated zRevRange
+            const candidateKeys: string[] = await client.zRange(
                 indexKeyToUse,
                 0,
-                limit - 1
+                limit - 1,
+                { REV: true }
             );
 
             if (candidateKeys.length === 0) {
@@ -267,7 +262,7 @@ export class SemanticCacheService {
         const prefixToUse = tenantId ? `${this.keyPrefix}${tenantId}:` : this.keyPrefix;
         const fullKey = prefixToUse + cacheKey;
         const timestamp = Date.now();
-        const ttl = TTL_MAP[metadata.type] || TTL_MAP[CacheType.GENERAL];
+        const ttl = TTL_MAP[metadata.type as CacheType] || TTL_MAP[CacheType.GENERAL];
 
         const pipeline = client.multi();
         pipeline.hSet(fullKey, {
@@ -306,18 +301,19 @@ export class SemanticCacheService {
         const client = getRedisClient();
 
         // Use SCAN to avoid blocking on large datasets
-        let cursor = "0";
+        // redis v4: scan returns { cursor: number, keys: string[] }
+        let cursor = 0;
         let deletedCount = 0;
         const keysToDelete: string[] = [];
 
         do {
-            const [nextCursor, keys] = (await client.scan(cursor, {
-                match: pattern,
-                count: 100,
-            })) as [string, string[]];
-            cursor = nextCursor;
-            keysToDelete.push(...keys);
-        } while (cursor !== "0");
+            const result = await client.scan(cursor, {
+                MATCH: pattern,
+                COUNT: 100,
+            });
+            cursor = result.cursor;
+            keysToDelete.push(...result.keys);
+        } while (cursor !== 0);
 
         if (keysToDelete.length === 0) {
             return 0;
@@ -329,7 +325,8 @@ export class SemanticCacheService {
         // Also remove from index: extract the cacheKey part from the key (strip prefix)
         const cacheKeys = keysToDelete.map((k) => k.replace(this.keyPrefix, ""));
         if (cacheKeys.length > 0) {
-            pipeline.zRem(this.indexKey, ...cacheKeys);
+            // redis v4 zRem accepts string | string[] (not rest args)
+            pipeline.zRem(this.indexKey, cacheKeys);
         }
         await pipeline.exec();
 
