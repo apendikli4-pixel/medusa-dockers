@@ -1,3 +1,17 @@
+# ═══════════════════════════════════════════════════════════════
+# PROJECT-AYNA-GENESIS — Production Stack
+# ═══════════════════════════════════════════════════════════════
+# Kullanım:
+#   1. .env dosyasını .env.example üzerinden doldur (TÜM secret'lar set olmalı)
+#   2. İlk kurulumda migration runner'ı bir kez çalıştır:
+#        docker compose -f docker-compose.prod.yml --profile migrate up migrate
+#   3. Stack'i ayağa kaldır:
+#        docker compose -f docker-compose.prod.yml up -d
+#   4. Sağlık kontrolü:
+#        curl http://localhost:9000/health   → liveness
+#        curl http://localhost:9000/ready    → readiness (DB+Redis+Meili ping)
+# ═══════════════════════════════════════════════════════════════
+
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -6,16 +20,30 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-medusa-genesis}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-medusa-genesis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - genesis_prod_network
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: medusa_redis_prod
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - genesis_prod_network
 
@@ -24,10 +52,33 @@ services:
     container_name: medusa_meilisearch_prod
     restart: unless-stopped
     environment:
-      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY:?MEILISEARCH_MASTER_KEY must be set}
       MEILI_NO_ANALYTICS: "true"
+      MEILI_ENV: production
     volumes:
       - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - genesis_prod_network
+
+  # ─── One-shot migration runner (profile: migrate) ───
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: medusa_migrate_prod
+    profiles: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
+    command: ["npx", "medusa", "db:migrate"]
     networks:
       - genesis_prod_network
 
@@ -38,23 +89,35 @@ services:
     container_name: medusa_server_prod
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
-      - meilisearch
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
       REDIS_URL: redis://redis:6379
       MEDUSA_WORKER_MODE: server
-      JWT_SECRET: ${JWT_SECRET}
-      COOKIE_SECRET: ${COOKIE_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET must be set}
       STORE_CORS: ${STORE_CORS}
       ADMIN_CORS: ${ADMIN_CORS}
       AUTH_CORS: ${AUTH_CORS}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-}
+      N8N_BRIDGE_ENABLED: ${N8N_BRIDGE_ENABLED:-false}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
       NODE_OPTIONS: --max-old-space-size=4096
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     ports:
       - "9000:9000"
     networks:
@@ -67,10 +130,12 @@ services:
     container_name: medusa_worker_prod
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
-      - meilisearch
-      - medusa-server
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      medusa-server:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
@@ -81,6 +146,7 @@ services:
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-}
       NODE_OPTIONS: --max-old-space-size=4096
     networks:
       - genesis_prod_network
@@ -92,7 +158,8 @@ services:
     container_name: medusa_storefront_prod
     restart: unless-stopped
     depends_on:
-      - medusa-server
+      medusa-server:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       MEDUSA_BACKEND_URL: http://medusa-server:9000
@@ -102,6 +169,12 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     ports:
       - "8000:8000"
     networks:
@@ -109,6 +182,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   meilisearch_data:
 
 networks:
