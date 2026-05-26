@@ -51,21 +51,14 @@ performans düşer ama functional doğruluk kaybolmaz.
 
 ---
 
-## 3. `src/modules/ayna/services/hybrid-ai.provider.ts`
+## 3. `src/modules/ayna/services/hybrid-ai.provider.ts` ✅ ÇÖZÜLDÜ (2026-05-24)
 
-**Sorun:**
-- `Injectable` decorator `@medusajs/framework/utils`'tan kaldırıldı (V2'de
-  modüller plain class olarak yazılır)
-- `result is of type unknown` (4 yer) — Gemini SDK response tipi açık değil,
-  type assertion gerek
-
-**Risk:** Düşük — `Injectable` decorator zaten no-op'tu (V2'de DI farklı çalışır).
-
-**Aksiyon:**
-1. `import { Injectable }` satırını kaldır
-2. Class üzerindeki `@Injectable()` decorator'ını kaldır
-3. Gemini response'lara explicit type assertion ekle: `as { text: string }`
-4. `@ts-nocheck` kaldır
+- `Injectable` import + decorator kaldırıldı
+- Ollama API response'larına explicit interface (`OllamaGenerateResponse`,
+  `OllamaEmbeddingResponse`) eklendi
+- `node-fetch` paketine bağımlılık kaldırıldı (Node 20 global `fetch`)
+- `@ts-nocheck` direktifi kaldırıldı, dosya artık katı tipte derliyor
+- Hybrid-ai spec'i `.skip`'ten geri alındı (6/6 test geçiyor)
 
 ---
 
@@ -74,7 +67,7 @@ performans düşer ama functional doğruluk kaybolmaz.
 | Dosya | Sorun | Aksiyon |
 |---|---|---|
 | `src/lib/__tests__/rate-limiter.spec.ts.skip` | vitest import (proje jest kullanıyor) | jest'e port et veya vitest devDep olarak ekle, sonra `.skip` uzantısını kaldır |
-| `src/modules/ayna/__tests__/hybrid-ai.provider.spec.ts.skip` | node-fetch v3 ESM-only, jest CJS ile çakışıyor | jest.config.js'e `transformIgnorePatterns: ['node_modules/(?!node-fetch)']` ekle veya hybrid-ai'i `node-fetch` yerine yerli `fetch`'e geçir |
+| ~~`src/modules/ayna/__tests__/hybrid-ai.provider.spec.ts.skip`~~ | ~~node-fetch v3 ESM-only~~ | ✅ ÇÖZÜLDÜ: node-fetch kaldırıldı, yerli fetch kullanılıyor, spec aktif (6/6 yeşil) |
 | `src/api/middlewares/prompt-security.ts` | No-op stub (InjectionDetectorService eksik) | `src/modules/conscience/services/injection-detector.service.ts` zaten var — onu bağla, no-op'tan çıkar |
 | Birkaç yerde `as any` cast (manager, redisClient, scan) | V2.15 strict tipler için ekledik | Doğru tip annotation'larıyla değiştir |
 

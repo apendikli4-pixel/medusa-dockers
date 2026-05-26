@@ -1,12 +1,43 @@
-// @ts-nocheck
-// TECH-DEBT (v2.13→v2.15 upgrade, 2026-05-24):
-// `Injectable` decorator @medusajs/framework/utils'tan kaldırıldı. V2 modülleri
-// plain class olarak yazılır. Result type assertions hâlâ eklenmeli.
-// Tracking: docs/TECH_DEBT.md
-// `Injectable` import'u + decorator çağrısı kaldırıldı — runtime crash önlendi.
+/**
+ * HybridAIProviderService — Gemini birincil + Ollama yedek
+ *
+ * Tarihçe: Önceden `Injectable` decorator kullanıyordu (@medusajs/framework/utils),
+ * V2.15'te bu kaldırıldı — plain class olarak yeniden yapılandırıldı.
+ * Ollama API response'larına explicit tip annotation eklendi (önceden
+ * `unknown` olarak inferred edilip @ts-nocheck ile geçilmişti).
+ */
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import nodeFetch from "node-fetch"
 import { Logger } from "@medusajs/framework/types"
+
+// Node 20+ artık global fetch sağlıyor; ek pakete (node-fetch ESM uyumsuzluğu)
+// gerek kalmadı. Local alias eski çağrı sitelerini bozmadan tutuyoruz.
+const nodeFetch = globalThis.fetch
+
+// ─── OLLAMA API TİPLERİ ────────────────────────────────────────────
+
+/**
+ * Ollama /api/generate response şeması (resmi dokümandan).
+ * @see https://github.com/ollama/ollama/blob/main/docs/api.md
+ */
+interface OllamaGenerateResponse {
+    model: string
+    created_at: string
+    response: string
+    done: boolean
+    /** Prompt token sayısı — usage telemetrisi için */
+    prompt_eval_count?: number
+    /** Üretilen token sayısı */
+    eval_count?: number
+    /** Nanosaniye cinsinden toplam süre */
+    total_duration?: number
+}
+
+/**
+ * Ollama /api/embeddings response şeması.
+ */
+interface OllamaEmbeddingResponse {
+    embedding: number[]
+}
 
 /**
  * Interface for AI provider responses
@@ -306,7 +337,7 @@ export class HybridAIProviderService {
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
       }
       
-      const result = await response.json()
+      const result = (await response.json()) as OllamaGenerateResponse
 
       const promptTokens = result.prompt_eval_count || 0
       const completionTokens = result.eval_count || 0
@@ -359,7 +390,7 @@ export class HybridAIProviderService {
           throw new Error(`Ollama embeddings API error: ${response.status} ${response.statusText}`)
         }
         
-        const result = await response.json()
+        const result = (await response.json()) as OllamaEmbeddingResponse
         embeddings.push(result.embedding)
       }
       
