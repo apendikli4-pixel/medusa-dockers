@@ -1,41 +1,93 @@
 /**
- * Prompt Security Middleware — Geçici No-Op Stub
+ * Prompt Security Middleware
  *
- * Tarihçe: Orijinal implementasyon `InjectionDetectorService`'i çözmeye
- * çalışıyordu, ama o servis modülde implemente edilmemişti. Eski middleware
- * zaten her istekte resolve hatası verip catch'e düşüyordu — yani çalışmıyordu.
+ * Tarama hedefi: Body, query ve route param'larındaki string alanlar.
+ * Algılayıcı: src/modules/conscience/services/injection-detector.service.ts
+ * (regex tabanlı, deterministik — DI'ya gerek yok, stateless instantiate).
  *
- * Bu stub:
- *   - Her isteği bloklamadan geçirir (fail-open, eski davranışla aynı)
- *   - İlk denemede info-level loglar (gerçek detector eklenene kadar
- *     görünür kalsın diye)
+ * Politika (fail-closed):
+ *   - Risk skoru > 70  → 400 BAD_REQUEST, body bloklanır, logger.warn
+ *   - Risk skoru 40-70 → uyarı header'ı X-Prompt-Risk eklenir, geçer
+ *   - Risk skoru < 40  → temiz, geçer
  *
- * Gerçek injection detector eklendiğinde:
- *   1. src/modules/conscience/services/injection-detector.service.ts'deki
- *      mevcut implementasyonu kullan (ayna değil, conscience modülünde var!)
- *   2. Bu dosyayı detector'a delegate edecek şekilde yeniden yaz
- *   3. Resolve fail durumunu MedusaError olarak yükselt (fail-closed yap)
+ * Sadece text içerikli alanlar taranır (max 4KB per field) — büyük binary
+ * yükler atlanır.
  */
 import type { MedusaNextFunction, MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { detectInjection } from "../../modules/conscience/services/injection-detector.patterns"
 
-let warnedOnce = false
+const MAX_FIELD_LEN = 4096
+const BLOCK_THRESHOLD = 70
+const WARN_THRESHOLD = 40
+
+type MinimalLogger = { warn: (msg: string, meta?: unknown) => void }
+const noopLogger: MinimalLogger = { warn: () => {} }
+
+function* iterateStringFields(obj: unknown, path: string = ""): Generator<{ path: string; value: string }> {
+    if (obj == null) return
+    if (typeof obj === "string") {
+        if (obj.length <= MAX_FIELD_LEN) yield { path, value: obj }
+        return
+    }
+    if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+            yield* iterateStringFields(obj[i], `${path}[${i}]`)
+        }
+        return
+    }
+    if (typeof obj === "object") {
+        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+            yield* iterateStringFields(v, path ? `${path}.${k}` : k)
+        }
+    }
+}
 
 export const promptSecurityMiddleware = async (
     req: MedusaRequest,
-    _res: MedusaResponse,
+    res: MedusaResponse,
     next: MedusaNextFunction
 ): Promise<void> => {
-    if (!warnedOnce) {
-        try {
-            const logger = req.scope.resolve("logger") as { warn: (msg: string) => void }
-            logger.warn(
-                "[PromptSecurity] No-op stub aktif — gerçek injection detector entegre edilmedi. "
-                + "Detay: src/api/middlewares/prompt-security.ts header'ı."
-            )
-        } catch {
-            // Logger bile çözülemiyorsa sessiz geç — middleware her halükarda fail-open
+    let logger: MinimalLogger = noopLogger
+    try {
+        logger = req.scope.resolve("logger") as MinimalLogger
+    } catch {
+        // logger çözümlenemezse sessiz devam
+    }
+
+    let maxRisk = 0
+    let blockedField: string | null = null
+    const allPatterns: string[] = []
+
+    for (const source of [req.body, req.query, req.params] as const) {
+        for (const field of iterateStringFields(source)) {
+            const result = detectInjection(field.value)
+            if (result.riskScore > maxRisk) maxRisk = result.riskScore
+            if (result.detectedPatterns.length > 0) allPatterns.push(...result.detectedPatterns)
+            if (result.riskScore > BLOCK_THRESHOLD) {
+                blockedField = field.path
+                break
+            }
         }
-        warnedOnce = true
+        if (blockedField) break
+    }
+
+    if (blockedField !== null) {
+        logger.warn("[PromptSecurity] Blocked request", {
+            path: req.path,
+            field: blockedField,
+            riskScore: maxRisk,
+            patterns: allPatterns,
+        })
+        res.status(400).json({
+            error: "PROMPT_INJECTION_DETECTED",
+            message: "Girdi güvenlik denetiminden geçemedi.",
+            field: blockedField,
+        })
+        return
+    }
+
+    if (maxRisk >= WARN_THRESHOLD) {
+        res.setHeader("X-Prompt-Risk", String(maxRisk))
     }
     return next()
 }
