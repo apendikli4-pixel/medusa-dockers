@@ -1,20 +1,24 @@
 import { sdk } from "@/lib/medusa-client"
 
+// Next 15: dynamic route params are async (Promise)
 export default async function Page({
   params,
 }: {
-  params: { countryCode: string }
+  params: Promise<{ countryCode: string }>
 }) {
+  await params // future-proof, route param henüz UI'da kullanılmıyor
+
   // Region bilgisini çek
   let regionId = ""
   try {
     const { regions } = await sdk.store.region.list()
-    if (regions.length > 0) {
+    if (regions && regions.length > 0) {
       regionId = regions[0].id
     }
   } catch (e) {
     console.error("Failed to fetch regions:", e)
   }
+  void regionId // satıcı listesi henüz UI'da yok
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
