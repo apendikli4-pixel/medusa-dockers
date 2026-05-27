@@ -79,3 +79,4 @@ build-output.txt
 
 # winston log audit files (runtime)
 logs/
+docker-compose.override.yml

@@ -55,8 +55,14 @@ export class Migration20260513120000 extends Migration {
         //    Boş string = deny-all (güvenli varsayılan)
         // ═══════════════════════════════════════════════════════════
 
+        // NOT: `ALTER DATABASE CURRENT` PostgreSQL'de geçerli değil — `CURRENT`
+        // gerçek bir DB ismi sanılır. current_database()'i dinamik SQL ile
+        // interpole ediyoruz.
         this.addSql(`
-            ALTER DATABASE CURRENT SET app.current_tenant_id = '';
+            DO $$
+            BEGIN
+                EXECUTE format('ALTER DATABASE %I SET app.current_tenant_id = %L', current_database(), '');
+            END$$;
         `)
 
         // ═══════════════════════════════════════════════════════════
@@ -273,6 +279,11 @@ export class Migration20260513120000 extends Migration {
         `)
 
         // GUC varsayılan sıfırlama
-        this.addSql(`ALTER DATABASE CURRENT RESET app.current_tenant_id;`)
+        this.addSql(`
+            DO $$
+            BEGIN
+                EXECUTE format('ALTER DATABASE %I RESET app.current_tenant_id', current_database());
+            END$$;
+        `)
     }
 }

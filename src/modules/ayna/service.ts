@@ -9,15 +9,10 @@ import AynaChatService from "./services/chat-service"
 import AynaDiagnosticService from "./services/diagnostic-service"
 import AynaStockIntelligenceService from "./services/stock-intelligence-service"
 import HybridAIProviderService from "./services/hybrid-ai.provider"
+import InjectionDetectorService from "../conscience/services/injection-detector.service"
 
 type InjectedDependencies = {
     logger: Logger
-    aynaMemoryService: AynaMemoryService
-    aynaToolService: AynaToolService
-    aynaChatService: AynaChatService
-    aynaDiagnosticService: AynaDiagnosticService
-    aynaStockIntelligenceService: AynaStockIntelligenceService
-    hybridAIProvider: HybridAIProviderService
 }
 
 export default class AynaService extends MedusaService({
@@ -38,12 +33,29 @@ export default class AynaService extends MedusaService({
     constructor(container: InjectedDependencies) {
         super(container)
         this.logger_ = container.logger
-        this.memoryService_ = container.aynaMemoryService
-        this.toolService_ = container.aynaToolService
-        this.chatService_ = container.aynaChatService
-        this.diagnosticService_ = container.aynaDiagnosticService
-        this.stockIntelligenceService_ = container.aynaStockIntelligenceService
-        this.hybridAIProvider_ = container.hybridAIProvider
+
+        // Medusa V2 modül container'ı sub-service'leri auto-discover etmiyor.
+        // Bu yüzden alt servisleri burada manuel instantiate ediyoruz.
+        this.hybridAIProvider_ = new HybridAIProviderService(container.logger)
+        this.memoryService_ = new AynaMemoryService({
+            logger: container.logger,
+        } as ConstructorParameters<typeof AynaMemoryService>[0])
+        this.diagnosticService_ = new AynaDiagnosticService({ logger: container.logger })
+        this.stockIntelligenceService_ = new AynaStockIntelligenceService({ logger: container.logger })
+        this.toolService_ = new AynaToolService({
+            logger: container.logger,
+            aynaMemoryService: this.memoryService_,
+            aynaDiagnosticService: this.diagnosticService_,
+            aynaStockIntelligenceService: this.stockIntelligenceService_,
+        })
+        const injectionDetector = new InjectionDetectorService({ logger: container.logger })
+        this.chatService_ = new AynaChatService({
+            logger: container.logger,
+            aynaMemoryService: this.memoryService_,
+            aynaToolService: this.toolService_,
+            hybridAIProvider: this.hybridAIProvider_,
+            injectionDetectorService: injectionDetector,
+        })
     }
 
     /**
