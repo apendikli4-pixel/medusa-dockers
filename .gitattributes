@@ -1,0 +1,21 @@
+# Default: auto-detect text files, normalize to LF on commit
+* text=auto eol=lf
+
+# Shell scripts must always be LF (containers run Linux shells)
+*.sh text eol=lf
+start.sh text eol=lf
+
+# Docker / compose / yaml must be LF
+Dockerfile* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files — never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tar.gz binary
+*.pdf binary

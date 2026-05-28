@@ -14,9 +14,14 @@ done
 echo "Postgres is up and running!"
 
 # Ensure database exists
-if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -lqt | cut -d \| -f 1 | grep -qw "medusa-genesis"; then
-  echo "Creating database medusa-genesis..."
-  PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -c "CREATE DATABASE \"medusa-genesis\""
+# psql -d postgres → bootstrap'a sabit erişimimiz olan default DB üzerinden bağlan
+# (aksi halde -U $POSTGRES_USER ile aynı isimde bir DB aranır ve FATAL döner).
+# DB adını DATABASE_URL'den çıkar (öncelik) ya da POSTGRES_DB'ye düş.
+DB_NAME=$(echo "${DATABASE_URL:-}" | sed -nE 's#.*/([^/?]+)(\?.*)?$#\1#p')
+DB_NAME="${DB_NAME:-${POSTGRES_DB:-medusa-genesis}}"
+if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d postgres -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+  echo "Creating database $DB_NAME..."
+  PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d postgres -c "CREATE DATABASE \"$DB_NAME\""
 fi
 
 export PATH=$PATH:/server/node_modules/.bin
