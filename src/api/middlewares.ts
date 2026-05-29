@@ -53,58 +53,17 @@ export default defineMiddlewares({
             middlewares: [tenantContextMiddleware, tenantAlsMiddleware, tenantDbGuardMiddleware],
         },
         // ─── ADMIN RBAC KORUMASI ───
+        // NOT: Medusa V2 /admin/* için built-in authenticate guard zaten
+        // uyguluyor (defineMiddlewares ile registered authenticate ÜSTÜNE
+        // bindirildiğinde 401 sebep oluyor). Kendi authenticate'imizi
+        // tekrar eklemeyip sadece RBAC ek katmanı koyuyoruz.
         {
             matcher: "/admin/products*",
-            middlewares: [authenticate("admin", ["bearer", "session"]), adminTenantRbac],
+            middlewares: [adminTenantRbac],
         },
         {
             matcher: "/admin/orders*",
-            middlewares: [authenticate("admin", ["bearer", "session"]), adminTenantRbac],
-        },
-        // Admin route'ları — JWT token zorunlu
-        {
-            matcher: "/admin/missions*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/ayna*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/gemini*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/generate-content*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/posts*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/system-health*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/setup*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/wishlist*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/test-brevo*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/test-workflow*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
-        },
-        {
-            matcher: "/admin/tenants*",
-            middlewares: [authenticate("admin", ["bearer", "session"])],
+            middlewares: [adminTenantRbac],
         },
         // Store route'ları — müşteri auth zorunlu
         {
