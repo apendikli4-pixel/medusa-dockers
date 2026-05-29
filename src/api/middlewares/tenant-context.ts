@@ -405,33 +405,19 @@ async function resolveTenantFromRequest(
         }
     }
 
-    // ─── KATMAN 5: DEFAULT_TENANT_ID Env Fallback (raw SQL) ───
+    // ─── KATMAN 5: DEFAULT_TENANT_ID Env Fallback ───
     // Single-tenant deployment veya ilk kurulum için: header yoksa env'deki
-    // varsayılan tenant ID'sini doğrudan pg üzerinden çek. TenantService'in
-    // MikroORM filter katmanı V2.15'te 'cond' property hatası verdiği için
-    // raw SQL ile bypass ediyoruz — bu fallback yolu zaten sade.
-    // Multi-tenant moda geçildiğinde DEFAULT_TENANT_ID env'ini boşaltın.
+    // varsayılan tenant ID'sini retrieve et. Multi-tenant moda geçildiğinde
+    // bu env değişkenini boşaltarak header zorunluluğunu geri getir.
     const defaultTenantId = process.env.DEFAULT_TENANT_ID
     if (defaultTenantId && defaultTenantId.trim().length > 0) {
-        try {
-            const pgConnection = req.scope.resolve("__pg_connection__") as {
-                raw: (sql: string, bindings: unknown[]) => Promise<{ rows: TenantRecord[] }>
-            }
-            const result = await pgConnection.raw(
-                'SELECT id, name, slug, sector, is_active, domain, settings, features, owner_id, metadata FROM tenant WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
-                [defaultTenantId.trim()]
-            )
-            const row = result.rows[0]
-            if (row) {
-                return { success: true, tenant: row, method: "x-tenant-id" }
-            }
-            logger.warn(
-                `[TenantContext] DEFAULT_TENANT_ID "${defaultTenantId}" tenant tablosunda bulunamadı (raw SQL).`
-            )
-        } catch (err) {
-            logger.warn(
-                `[TenantContext] DEFAULT_TENANT_ID raw SQL hatası: ${err instanceof Error ? err.message : "bilinmeyen"}`
-            )
+        const tenant = await safeRetrieveTenant(
+            tenantService,
+            defaultTenantId.trim(),
+            logger
+        )
+        if (tenant) {
+            return { success: true, tenant, method: "x-tenant-id" }
         }
     }
 

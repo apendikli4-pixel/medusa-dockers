@@ -82,34 +82,30 @@ export default async function tenantIsolationFilterLoader(
         // ALS'den dinamik tenant_id okur.
         // args: false → bu filter dışarıdan parametre almaz,
         //               kendi parametresini ALS'den üretir.
+        // MikroORM v6 imzası: addFilter(name, cond, entityName?, enabled?)
+        // ÖNEMLİ: 2. argüman doğrudan fonksiyon olmalı — {cond: fn} obje
+        // sarması verirsek MikroORM "cond"u entity field zannediyor ve
+        // "Trying to query by not existing property Tenant.cond" hatası fırlatıyor.
         manager.addFilter(
             TENANT_FILTER_NAME,
-            {
-                cond: (args: Record<string, unknown>, type: string) => {
-                    // ─── 1. ALS'den tenant_id oku ───
-                    const tenantId = getTenantId()
+            (_args: Record<string, unknown>) => {
+                // ─── 1. ALS'den tenant_id oku ───
+                const tenantId = getTenantId()
 
-                    // ─── 2. Bypass kontrolü ───
-                    // Worker/Cron (ALS store yok) → undefined
-                    // System bypass → "__system__"
-                    // Her iki durumda da filter pasif → tüm veri görünür
-                    if (!tenantId || tenantId === SYSTEM_TENANT_ID) {
-                        return {} // Boş koşul = WHERE 1=1 (tüm satırlar)
-                    }
+                // ─── 2. Bypass kontrolü ───
+                // Worker/Cron (ALS store yok) → undefined
+                // System bypass → "__system__"
+                // Her iki durumda da filter pasif → tüm veri görünür
+                if (!tenantId || tenantId === SYSTEM_TENANT_ID) {
+                    return {} // Boş koşul = WHERE 1=1 (tüm satırlar)
+                }
 
-                    // ─── 3. Normal istek — tenant izolasyonu ───
-                    // Tenant tablosunda filtreleme "id" kolonu üzerinden yapılır
-                    // (bu filter sadece Tenant entity'sine uygulanır)
-                    return { id: tenantId }
-                },
-                // args: false → dışarıdan parametre bekleme,
-                // dinamik parametreyi ALS'den al
-                args: false,
-                // default: true → her sorguda otomatik aktif
-                // Devre dışı bırakmak için:
-                //   em.find(Tenant, {}, { filters: { tenantIsolation: false } })
-                default: true,
-            }
+                // ─── 3. Normal istek — tenant izolasyonu ───
+                // Tenant tablosunda filtreleme "id" kolonu üzerinden yapılır
+                return { id: tenantId }
+            },
+            "Tenant",   // sadece Tenant entity'sine uygula
+            true        // varsayılan olarak aktif
         )
     } catch (error: unknown) {
         // Loader hatası uygulama başlangıcını bozmamalı.
