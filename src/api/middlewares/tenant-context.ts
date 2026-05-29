@@ -405,31 +405,22 @@ async function resolveTenantFromRequest(
         }
     }
 
-    // ─── KATMAN 5: Tek-Tenant Fallback (single-tenant mode) ───
-    // Sistemde tek bir aktif tenant varsa onu otomatik kullan.
-    // Admin UI ve ilk kurulum akışı header gönderemediği için bu fallback
-    // gerekli — multi-tenant moda geçildiğinde (2+ tenant) otomatik devre dışı.
-    try {
-        const allTenants = await (tenantService as unknown as {
-            listTenants: (
-                filters?: Record<string, unknown>,
-                config?: Record<string, unknown>
-            ) => Promise<TenantRecord[]>
-        }).listTenants({}, { take: 5 })
-
-        const activeTenants = (allTenants || []).filter((t) => t.is_active === true)
-
-        if (activeTenants.length === 1) {
-            return { success: true, tenant: activeTenants[0], method: "x-tenant-id" }
+    // ─── KATMAN 5: DEFAULT_TENANT_ID Env Fallback ───
+    // Single-tenant deployment veya ilk kurulum için: header yoksa env'deki
+    // varsayılan tenant ID'sini retrieve et. Multi-tenant moda geçildiğinde
+    // bu env değişkenini boşaltarak header zorunluluğunu geri getir.
+    const defaultTenantId = process.env.DEFAULT_TENANT_ID
+    if (defaultTenantId && defaultTenantId.trim().length > 0) {
+        const tenant = await safeRetrieveTenant(
+            tenantService,
+            defaultTenantId.trim(),
+            logger
+        )
+        if (tenant) {
+            return { success: true, tenant, method: "x-tenant-id" }
         }
-        if (activeTenants.length > 1) {
-            logger.debug(
-                `[TenantContext] Tek-tenant fallback devre dışı: ${activeTenants.length} aktif tenant var, header zorunlu.`
-            )
-        }
-    } catch (err) {
         logger.warn(
-            `[TenantContext] Single-tenant fallback hatası: ${err instanceof Error ? err.message : "bilinmeyen"}`
+            `[TenantContext] DEFAULT_TENANT_ID "${defaultTenantId}" tenant tablosunda bulunamadı.`
         )
     }
 

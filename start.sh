@@ -45,7 +45,7 @@ if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ];
         # Kod değişikliği yapan kullanıcı manuel olarak:
         #   docker compose exec medusa-server sh -c "rm -rf .medusa && ./node_modules/.bin/medusa build"
         # çalıştırmalı ya da FORCE_BUILD=1 ile başlatmalı.
-        if [ "${FORCE_BUILD:-0}" = "1" ] || [ ! -f "/server/.medusa/server/index.js" ]; then
+        if [ "${FORCE_BUILD:-0}" = "1" ] || [ ! -f "/server/.medusa/server/medusa-config.js" ] || [ ! -d "/server/.medusa/server/src/api" ]; then
             echo "Build artifacts missing or FORCE_BUILD=1; running medusa build..."
             ./node_modules/.bin/medusa build || { echo "Build failed"; exit 1; }
         else
