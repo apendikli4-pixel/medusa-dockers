@@ -83,29 +83,23 @@ export default async function tenantIsolationFilterLoader(
         // args: false → bu filter dışarıdan parametre almaz,
         //               kendi parametresini ALS'den üretir.
         // MikroORM v6 imzası: addFilter(name, cond, entityName?, enabled?)
-        // ÖNEMLİ: 2. argüman doğrudan fonksiyon olmalı — {cond: fn} obje
-        // sarması verirsek MikroORM "cond"u entity field zannediyor ve
-        // "Trying to query by not existing property Tenant.cond" hatası fırlatıyor.
+        // KARAR: Filter default OFF — yalnızca HTTP middleware'lerde,
+        // ALS'de tenant set edildikten sonra aktive ediliyor.
+        // Default ON yaparsak migration/CLI/loader bağlamları da filter çalıştırır
+        // ve "No arguments provided" hatası fırlatır.
+        // PostgreSQL RLS (Migration20260513120000) zaten DB-seviyesinde
+        // birincil savunma sağlıyor; bu filter ikincil katman.
         manager.addFilter(
             TENANT_FILTER_NAME,
             (_args: Record<string, unknown>) => {
-                // ─── 1. ALS'den tenant_id oku ───
                 const tenantId = getTenantId()
-
-                // ─── 2. Bypass kontrolü ───
-                // Worker/Cron (ALS store yok) → undefined
-                // System bypass → "__system__"
-                // Her iki durumda da filter pasif → tüm veri görünür
                 if (!tenantId || tenantId === SYSTEM_TENANT_ID) {
-                    return {} // Boş koşul = WHERE 1=1 (tüm satırlar)
+                    return {}
                 }
-
-                // ─── 3. Normal istek — tenant izolasyonu ───
-                // Tenant tablosunda filtreleme "id" kolonu üzerinden yapılır
                 return { id: tenantId }
             },
-            "Tenant",   // sadece Tenant entity'sine uygula
-            true        // varsayılan olarak aktif
+            "Tenant",
+            false   // ← Default DISABLED. HTTP middleware'de em.setFilterParams + setFlushMode ile aktive edilebilir.
         )
     } catch (error: unknown) {
         // Loader hatası uygulama başlangıcını bozmamalı.
