@@ -34,14 +34,23 @@ medusa db:migrate || { echo "Migrations failed"; exit 1; }
 if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
     echo "Starting role: $MEDUSA_WORKER_MODE"
     if [ "$NODE_ENV" != "production" ]; then
-        echo "Development environment detected. Cleaning build artifacts..."
         if [ ! -d "/server/node_modules" ]; then
             echo "node_modules not found. Installing..."
             npm install --legacy-peer-deps
         else
             echo "node_modules found. Skipping install."
         fi
-        ./node_modules/.bin/medusa build || { echo "Build failed"; exit 1; }
+        # Build sadece eksik veya boş ise gerçekleşir.
+        # Bu sayede her container restart'ında ~3 dk build cezası ödenmez.
+        # Kod değişikliği yapan kullanıcı manuel olarak:
+        #   docker compose exec medusa-server sh -c "rm -rf .medusa && ./node_modules/.bin/medusa build"
+        # çalıştırmalı ya da FORCE_BUILD=1 ile başlatmalı.
+        if [ "${FORCE_BUILD:-0}" = "1" ] || [ ! -f "/server/.medusa/server/index.js" ]; then
+            echo "Build artifacts missing or FORCE_BUILD=1; running medusa build..."
+            ./node_modules/.bin/medusa build || { echo "Build failed"; exit 1; }
+        else
+            echo "Existing .medusa/server build found — skipping rebuild."
+        fi
         if [ -f "/server/dist/public/admin/index.html" ]; then
             echo "Syncing admin build into runtime public directory..."
             rm -rf /server/public/admin
