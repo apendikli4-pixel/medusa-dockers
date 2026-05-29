@@ -63,7 +63,14 @@ const ListTenantsQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(100).optional().default(20),
     offset: z.coerce.number().min(0).optional().default(0),
     sector: SectorSchema.optional(),
-    is_active: z.enum(["true", "false"]).optional().transform(v => v === "true"),
+    // KRİTİK: .optional().transform() optional değer undefined iken bile
+    // transform çalıştırıp false döndürüyordu → her listeleme is_active=false
+    // ile filtreleniyor → sonuç hep boş. Önce optional, sonra transform sadece
+    // tanımlıysa çalışsın diye preprocess kullanıyoruz.
+    is_active: z.preprocess(
+        (v) => v === undefined ? undefined : v === "true" || v === true,
+        z.boolean().optional()
+    ),
     name: z.string().optional(),
 })
 
