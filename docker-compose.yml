@@ -254,7 +254,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - NODE_ENV=production
+      # Storefront, backend'in NODE_ENV'inden bağımsız: dev mode'da
+      # HMR kullanıyor (Dockerfile npm run dev). NODE_ENV=production
+      # 'Code generation from strings disallowed' middleware hatası verir.
+      - NODE_ENV=development
       - MEDUSA_BACKEND_URL=http://medusa-server:9000
       - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
       - NEXT_PUBLIC_SEARCH_ENDPOINT=http://localhost:9000
