@@ -47,20 +47,79 @@ export async function getDefaultRegion(): Promise<StoreRegion | null> {
 
 /**
  * Ürün listesi — region'a göre fiyatlandırılmış.
+ * Opsiyonel filtreler:
+ *   q: full-text arama
+ *   categoryId: tek kategori
+ *   categoryHandle: handle ile filtre (önce id'ye dönüştürülür)
  */
-export async function listProducts(limit = 24): Promise<StoreProduct[]> {
+export async function listProducts(opts: {
+    limit?: number
+    q?: string
+    categoryId?: string
+    categoryHandle?: string
+} = {}): Promise<StoreProduct[]> {
     const region = await getDefaultRegion()
     if (!region) return []
+
+    let categoryId = opts.categoryId
+    if (!categoryId && opts.categoryHandle) {
+        const cat = await getCategoryByHandle(opts.categoryHandle)
+        categoryId = cat?.id
+    }
+
     try {
-        const { products } = await sdk.store.product.list({
+        const query: Record<string, unknown> = {
             region_id: region.id,
-            limit,
+            limit: opts.limit ?? 24,
             fields: "id,title,handle,description,thumbnail,*variants.calculated_price",
-        })
+        }
+        if (opts.q && opts.q.trim()) query.q = opts.q.trim()
+        if (categoryId) query.category_id = [categoryId]
+
+        const { products } = await sdk.store.product.list(query)
         return (products as unknown) as StoreProduct[]
     } catch (err) {
         console.error("[listProducts]", err)
         return []
+    }
+}
+
+export type StoreCategory = {
+    id: string
+    name: string
+    handle: string
+}
+
+/**
+ * Tüm kategoriler — sidebar/dropdown için.
+ */
+export async function listCategories(): Promise<StoreCategory[]> {
+    try {
+        const { product_categories } = await sdk.store.category.list({
+            fields: "id,name,handle",
+            limit: 50,
+        })
+        return (product_categories as unknown) as StoreCategory[]
+    } catch (err) {
+        console.error("[listCategories]", err)
+        return []
+    }
+}
+
+/**
+ * Tek kategori (handle ile).
+ */
+export async function getCategoryByHandle(handle: string): Promise<StoreCategory | null> {
+    try {
+        const { product_categories } = await sdk.store.category.list({
+            handle,
+            limit: 1,
+            fields: "id,name,handle",
+        })
+        return ((product_categories?.[0] as unknown) as StoreCategory) || null
+    } catch (err) {
+        console.error("[getCategoryByHandle]", err)
+        return null
     }
 }
 

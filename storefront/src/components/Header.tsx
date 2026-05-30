@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { retrieveCart } from "@/lib/server/cart"
+import SearchBox from "./SearchBox"
 
 export default async function Header({ countryCode }: { countryCode: string }) {
     const cart = await retrieveCart()
@@ -12,6 +13,7 @@ export default async function Header({ countryCode }: { countryCode: string }) {
                     <span className="ag-brand-mark">A</span>
                     <span>Ayna Genesis</span>
                 </Link>
+                <SearchBox countryCode={countryCode} />
                 <nav className="ag-nav">
                     <Link href={`/${countryCode}`}>Mağaza</Link>
                     <Link href={`/${countryCode}/cart`} className="ag-cart-link">
