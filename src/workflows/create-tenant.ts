@@ -108,7 +108,7 @@ const createTenantRecordStep = createStep(
             sector: input.sector,
             domain: input.domain ?? null,
             settings: input.settings ?? null,
-            features: "[]",
+            features: [],
             is_active: true,
         })
 
@@ -362,17 +362,13 @@ const linkTenantResourcesStep = createStep(
             [Modules.API_KEY]: { api_key_id: input.apiKeyId },
         })
 
-        // Sales Channel ↔ API Key (native Medusa)
-        await remoteLink.create({
-            [Modules.API_KEY]: { api_key_id: input.apiKeyId },
-            [Modules.SALES_CHANNEL]: { sales_channel_id: input.salesChannelId },
-        })
-
-        // Sales Channel ↔ Stock Location (native Medusa)
-        await remoteLink.create({
-            [Modules.SALES_CHANNEL]: { sales_channel_id: input.salesChannelId },
-            [Modules.STOCK_LOCATION]: { stock_location_id: input.stockLocationId },
-        })
+        // NOT: Eski kodda burada "Sales Channel ↔ API Key" ve
+        // "Sales Channel ↔ Stock Location" link'leri vardı. Bu link tanımları
+        // src/links/ altında bulunmuyor — yalnızca tenant ↔ X link'leri var.
+        // Medusa V2 bu cross-module link'leri SDK içinde otomatik kurar
+        // (linkSalesChannelsToApiKeyWorkflow vb.). Burada manual çağrı
+        // "Module to type api_key and sales_channel by keys ... was not found"
+        // hatası fırlatıyordu. Kaldırıldı.
 
         logger.info(`[Provisioning] Tüm kaynaklar bağlandı — Tenant: ${input.tenantId}`)
         return new StepResponse({ linked: true }, input)
@@ -387,8 +383,8 @@ const linkTenantResourcesStep = createStep(
             { [TENANT_MODULE]: { tenant_id: input.tenantId }, [Modules.SALES_CHANNEL]: { sales_channel_id: input.salesChannelId } },
             { [TENANT_MODULE]: { tenant_id: input.tenantId }, [Modules.STOCK_LOCATION]: { stock_location_id: input.stockLocationId } },
             { [TENANT_MODULE]: { tenant_id: input.tenantId }, [Modules.API_KEY]: { api_key_id: input.apiKeyId } },
-            { [Modules.API_KEY]: { api_key_id: input.apiKeyId }, [Modules.SALES_CHANNEL]: { sales_channel_id: input.salesChannelId } },
-            { [Modules.SALES_CHANNEL]: { sales_channel_id: input.salesChannelId }, [Modules.STOCK_LOCATION]: { stock_location_id: input.stockLocationId } },
+            // Native Medusa link'leri yukarıda kaldırıldı (up tarafında),
+            // dolayısıyla compensation da bunları dismiss etmiyor.
         ]
 
         for (const link of links) {
