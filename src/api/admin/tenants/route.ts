@@ -16,6 +16,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
 import { TENANT_MODULE } from "../../../modules/tenant"
 import type TenantService from "../../../modules/tenant/service"
+import { createTenantProvisioningWorkflow } from "../../../workflows/create-tenant"
 
 // ─── ZOD ŞEMALARI ───
 
@@ -166,11 +167,9 @@ export const POST = async (
         // ─── Request body'yi Zod ile doğrula ───
         const data = CreateTenantSchema.parse(req.body)
 
-        // ─── Servisi çağır (validasyon + oluşturma) ───
-        const { createTenantWorkflow } = await import("../../../workflows/create-tenant.js")
-        // Zod nullable() workflow input'undaki optional ile birebir uymadığı için
-        // explicit cast — runtime payload aynı, sadece tip kontrolü uyumu.
-        const { result } = await createTenantWorkflow(req.scope).run({
+        // Workflow'u top-level import edip kullanıyoruz — dynamic import .js
+        // uzantısı sorunu çıkarıyor (TS nodenext modu).
+        const { result } = await createTenantProvisioningWorkflow(req.scope).run({
             input: {
                 ...data,
                 domain: data.domain ?? undefined,
@@ -193,9 +192,14 @@ export const POST = async (
             })
         }
 
-        logger.error(`[Tenant API] Oluşturma hatası: ${error instanceof Error ? error.message : "Bilinmeyen hata"}`)
+        // Workflow non-Error fırlatabiliyor (compensation result vs.)
+        const errStr = error instanceof Error
+            ? `${error.message}\n${error.stack}`
+            : JSON.stringify(error, null, 2)
+        logger.error(`[Tenant API] Oluşturma hatası: ${errStr}`)
         return res.status(500).json({
             error: "Mağaza oluşturulurken bir hata oluştu.",
+            debug: error instanceof Error ? error.message : String(error),
         })
     }
 }
