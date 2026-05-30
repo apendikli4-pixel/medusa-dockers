@@ -174,7 +174,7 @@ services:
     ports:
       - "9000:9000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - MEDUSA_WORKER_MODE=server
@@ -214,7 +214,7 @@ services:
       - redis-master
     command: [ "/bin/sh", "./start.sh" ]
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - MEDUSA_WORKER_MODE=worker
@@ -254,7 +254,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - MEDUSA_BACKEND_URL=http://medusa-server:9000
       - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
       - NEXT_PUBLIC_SEARCH_ENDPOINT=http://localhost:9000
