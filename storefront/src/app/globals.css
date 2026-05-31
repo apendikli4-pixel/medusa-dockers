@@ -1,5 +1,10 @@
-/* Storefront global stylesheet — Ayna Genesis minimal e-commerce theme */
+/* Storefront global stylesheet — Ayna Genesis çok sektörlü tema */
 
+/*
+ * CSS değişkenleri — sektör temaları tarafından <html style="..."> ile override edilir.
+ * Buradaki :root değerleri sadece backend tenant resolve edilemediğinde fallback.
+ * Tema haritası: storefront/src/lib/themes.ts
+ */
 :root {
     --ag-bg: #fafafa;
     --ag-bg-card: #ffffff;
@@ -13,13 +18,45 @@
     --ag-success: #16a34a;
     --ag-radius: 0.5rem;
     --ag-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+    --ag-font-heading: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ag-font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ag-text); background: var(--ag-bg); }
+html, body { margin: 0; padding: 0; font-family: var(--ag-font-body); color: var(--ag-text); background: var(--ag-bg); }
+h1, h2, h3, h4 { font-family: var(--ag-font-heading); }
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; }
 img { display: block; max-width: 100%; height: auto; }
+
+/* ─── SEKTÖR İNCE AYARLARI ─── */
+/* Tema değişkenleri çoğu şeyi hallediyor; bunlar yalnızca sektöre özgü ufak dokunuşlar. */
+
+/* HORECA — kategori sidebar'ında daha sıcak fon, hero için italik tagline */
+html[data-sector="horeca"] .ag-sidebar { background: #fff7ed; }
+html[data-sector="horeca"] .ag-hero p { font-style: italic; }
+html[data-sector="horeca"] .ag-card-title { font-family: var(--ag-font-heading); }
+
+/* B2B — kompakt kart, dense grid */
+html[data-sector="b2b"] .ag-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; }
+html[data-sector="b2b"] .ag-card-body { padding: 0.75rem; }
+html[data-sector="b2b"] .ag-card-title { font-size: 0.9rem; }
+html[data-sector="b2b"] .ag-card-desc { font-size: 0.78rem; min-height: 2.2em; }
+html[data-sector="b2b"] .ag-card-price { font-size: 0.95rem; }
+html[data-sector="b2b"] .ag-hero { padding: 1.5rem 0 1rem; }
+
+/* FASHION — keskin köşeler, büyük ürün görseli, üst harfli başlıklar */
+html[data-sector="fashion"] .ag-card,
+html[data-sector="fashion"] .ag-sidebar,
+html[data-sector="fashion"] .ag-product-detail,
+html[data-sector="fashion"] .ag-account-card,
+html[data-sector="fashion"] .ag-cart-summary { border-radius: 0; }
+html[data-sector="fashion"] .ag-card { border: 0; border-bottom: 1px solid var(--ag-border); }
+html[data-sector="fashion"] .ag-section-title { text-transform: uppercase; letter-spacing: 0.15em; font-weight: 400; }
+html[data-sector="fashion"] .ag-hero h1 { font-weight: 400; letter-spacing: 0.05em; }
+html[data-sector="fashion"] .ag-grid { gap: 2rem; }
+html[data-sector="fashion"] .ag-card-title { font-weight: 400; letter-spacing: 0.03em; }
+html[data-sector="fashion"] .ag-btn-primary { border-radius: 0; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; }
 
 /* Helpers from earlier */
 .h-full { height: 100%; }

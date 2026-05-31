@@ -1,4 +1,6 @@
 import { listProducts } from "@/lib/server/data"
+import { retrieveCurrentTenant } from "@/lib/server/tenant"
+import { getSectorTheme } from "@/lib/themes"
 import ProductCard from "@/components/ProductCard"
 import CategorySidebar from "@/components/CategorySidebar"
 
@@ -11,14 +13,22 @@ export default async function HomePage({
 }) {
     const { countryCode } = await params
     const { q } = await searchParams
-    const products = await listProducts({ q, limit: 24 })
+    const [products, tenant] = await Promise.all([
+        listProducts({ q, limit: 24 }),
+        retrieveCurrentTenant(),
+    ])
+    const theme = getSectorTheme(tenant?.sector)
+    const heroTitle = tenant?.name || "Ayna Genesis"
+    const heroTagline =
+        theme.tagline ||
+        "Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı."
 
     return (
         <main className="ag-page">
             {!q && (
                 <section className="ag-hero">
-                    <h1>Ayna Genesis</h1>
-                    <p>Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı.</p>
+                    <h1>{heroTitle}</h1>
+                    <p>{heroTagline}</p>
                 </section>
             )}
 
