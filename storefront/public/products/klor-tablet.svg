@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef9c3"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <radialGradient id="tab" cx="0.4" cy="0.35" r="0.8">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg2)"/>
+  <ellipse cx="300" cy="430" rx="150" ry="46" fill="#94a3b8"/>
+  <rect x="150" y="320" width="300" height="110" fill="#e2e8f0"/>
+  <ellipse cx="300" cy="320" rx="150" ry="46" fill="url(#tab)"/>
+  <ellipse cx="300" cy="320" rx="110" ry="32" fill="#f1f5f9"/>
+  <ellipse cx="300" cy="318" rx="40" ry="12" fill="#cbd5e1"/>
+  <ellipse cx="220" cy="470" rx="80" ry="26" fill="#94a3b8"/>
+  <rect x="140" y="410" width="160" height="60" fill="#e2e8f0"/>
+  <ellipse cx="220" cy="410" rx="80" ry="26" fill="url(#tab)"/>
+  <ellipse cx="220" cy="408" rx="22" ry="7" fill="#cbd5e1"/>
+  <circle cx="410" cy="180" r="60" fill="#16a34a" opacity="0.9"/>
+  <text x="410" y="198" font-family="system-ui, sans-serif" font-size="46" font-weight="800" fill="#fff" text-anchor="middle">Cl</text>
+  <text x="300" y="545" font-family="system-ui, sans-serif" font-size="34" font-weight="700" fill="#92400e" text-anchor="middle">Klor Tableti</text>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <linearGradient id="robot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg3)"/>
+  <path d="M0 470 q150 -30 300 0 t300 0 v130 H0 z" fill="#60a5fa" opacity="0.4"/>
+  <rect x="170" y="250" width="260" height="170" rx="40" fill="url(#robot)"/>
+  <path d="M250 250 q50 -80 100 0" stroke="#475569" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <circle cx="250" cy="320" r="26" fill="#38bdf8"/>
+  <circle cx="250" cy="320" r="12" fill="#0ea5e9"/>
+  <circle cx="350" cy="320" r="26" fill="#38bdf8"/>
+  <circle cx="350" cy="320" r="12" fill="#0ea5e9"/>
+  <rect x="180" y="410" width="240" height="34" rx="14" fill="#f59e0b"/>
+  <rect x="195" y="410" width="14" height="34" fill="#b45309"/>
+  <rect x="235" y="410" width="14" height="34" fill="#b45309"/>
+  <rect x="275" y="410" width="14" height="34" fill="#b45309"/>
+  <rect x="315" y="410" width="14" height="34" fill="#b45309"/>
+  <rect x="355" y="410" width="14" height="34" fill="#b45309"/>
+  <rect x="395" y="410" width="14" height="34" fill="#b45309"/>
+  <circle cx="450" cy="220" r="14" fill="#fff" opacity="0.7"/>
+  <circle cx="480" cy="270" r="9" fill="#fff" opacity="0.6"/>
+  <circle cx="140" cy="240" r="11" fill="#fff" opacity="0.6"/>
+  <text x="300" y="540" font-family="system-ui, sans-serif" font-size="32" font-weight="700" fill="#1e3a8a" text-anchor="middle">Temizlik Robotu</text>
+</svg>
