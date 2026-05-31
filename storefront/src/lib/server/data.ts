@@ -37,7 +37,9 @@ export async function getDefaultRegion(): Promise<StoreRegion | null> {
     try {
         const { regions } = await sdk.store.region.list({ fields: "id,name,currency_code,countries.iso_2,countries.name" })
         if (!regions?.length) return null
-        const match = regions.find((r) => r.name === DEFAULT_REGION_NAME)
+        const match = regions.find(
+            (r: { name?: string }) => r.name === DEFAULT_REGION_NAME
+        )
         return (match || regions[0]) as StoreRegion
     } catch (err) {
         console.error("[getDefaultRegion]", err)
