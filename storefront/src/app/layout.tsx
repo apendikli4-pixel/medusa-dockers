@@ -1,12 +1,61 @@
 import "./globals.css"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { ReactNode } from "react"
 import { retrieveCurrentTenant } from "@/lib/server/tenant"
 import { getSectorTheme, buildThemeStyle } from "@/lib/themes"
+import ChatWidget from "@/modules/chat/components/chat-widget"
+import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google"
 
-export const metadata: Metadata = {
-    title: "Ayna Genesis — Yeni Nesil AI Ticaret",
-    description: "Yapay zeka destekli, otonom e-ticaret altyapısı.",
+const inter = Inter({
+    subsets: ["latin", "latin-ext"],
+    variable: "--font-inter",
+    display: "swap",
+})
+
+const playfair = Playfair_Display({
+    subsets: ["latin", "latin-ext"],
+    variable: "--font-playfair",
+    display: "swap",
+})
+
+const cormorant = Cormorant_Garamond({
+    subsets: ["latin", "latin-ext"],
+    weight: ["400", "500", "600", "700"],
+    variable: "--font-cormorant",
+    display: "swap",
+})
+
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+    const tenant = await retrieveCurrentTenant()
+    const theme = getSectorTheme(tenant?.sector)
+    const title = tenant?.name
+        ? `${tenant.name} — ${theme.tagline ?? "Ayna Genesis"}`
+        : "Ayna Genesis — Yeni Nesil AI Ticaret"
+
+    return {
+        title: {
+            template: `%s | ${tenant?.name || "Ayna Genesis"}`,
+            default: title,
+        },
+        description: theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi.",
+        keywords: ["e-ticaret", "yapay zeka", "otonom ticaret", "Ayna AI", "havuz malzemeleri", tenant?.sector || ""],
+        robots: {
+            index: true,
+            follow: true,
+        },
+        openGraph: {
+            title,
+            description: theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı.",
+            siteName: tenant?.name || "Ayna Genesis",
+            type: "website"
+        }
+    }
 }
 
 /**
@@ -30,34 +79,20 @@ export default async function RootLayout({
         tenant?.theme?.primaryColor ?? null
     )
     const sectorAttr = (tenant?.sector || "retail").toLowerCase()
-    // Page title tenant adıyla zenginleştir
-    const title = tenant?.name
-        ? `${tenant.name} — ${theme.tagline ?? "Ayna Genesis"}`
-        : "Ayna Genesis — Yeni Nesil AI Ticaret"
-
+    
     return (
         <html
             lang="tr"
-            className="h-full antialiased"
+            className={`h-full antialiased ${inter.variable} ${playfair.variable} ${cormorant.variable}`}
             data-sector={sectorAttr}
             style={themeStyle}
         >
             <head>
-                <title>{title}</title>
-                {/* Sektör temalarında kullanılan Google Fonts — system font fallback'i her CSS değişkeninde var */}
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link
-                    rel="preconnect"
-                    href="https://fonts.gstatic.com"
-                    crossOrigin="anonymous"
-                />
-                <link
-                    rel="stylesheet"
-                    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap"
-                />
+                {/* SEO Metadata is injected automatically by Next.js App Router */}
             </head>
-            <body className="min-h-full flex flex-col">
-                <main className="flex-grow">{children}</main>
+            <body className="min-h-full flex flex-col bg-gray-50/50">
+                <main className="flex-grow relative z-10">{children}</main>
+                <ChatWidget />
             </body>
         </html>
     )

@@ -1,62 +1,97 @@
-/* Storefront global stylesheet — Ayna Genesis çok sektörlü tema */
+@import "tailwindcss";
+@source "../components";
+@source "../modules";
+@source "../app";
 
-/*
- * CSS değişkenleri — sektör temaları tarafından <html style="..."> ile override edilir.
- * Buradaki :root değerleri sadece backend tenant resolve edilemediğinde fallback.
- * Tema haritası: storefront/src/lib/themes.ts
- */
-:root {
-    --ag-bg: #fafafa;
-    --ag-bg-card: #ffffff;
-    --ag-border: #e5e7eb;
-    --ag-text: #111827;
-    --ag-muted: #6b7280;
-    --ag-primary: #1e40af;
-    --ag-primary-hover: #1e3a8a;
-    --ag-accent: #f59e0b;
-    --ag-error: #dc2626;
-    --ag-success: #16a34a;
-    --ag-radius: 0.5rem;
-    --ag-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
-    --ag-font-heading: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --ag-font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@theme {
+  --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-playfair: "Playfair Display", ui-serif, Georgia, serif;
+  --font-cormorant: "Cormorant Garamond", ui-serif, Georgia, serif;
+
+  --color-brand-primary: var(--ag-primary, #0f172a);
+  --color-brand-hover: var(--ag-primary-hover, #334155);
+  --color-brand-accent: var(--ag-accent, #c2410c);
+  --color-brand-light: #f8fafc;
+  --color-brand-muted: #94a3b8;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-fade-in-up: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-reveal: reveal 1s cubic-bezier(0.77, 0, 0.175, 1) forwards;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; font-family: var(--ag-font-body); color: var(--ag-text); background: var(--ag-bg); }
-h1, h2, h3, h4 { font-family: var(--ag-font-heading); }
-a { color: inherit; text-decoration: none; }
-button { font-family: inherit; cursor: pointer; }
-img { display: block; max-width: 100%; height: auto; }
+@layer base {
+  :root {
+    --ag-bg: #fafafa;
+    --ag-bg-card: #ffffff;
+    --ag-border: #e2e8f0;
+    --ag-text: #0f172a;
+    --ag-muted: #64748b;
+    --ag-primary: #0f172a; /* Lüks bir Slate-900 */
+    --ag-primary-hover: #334155;
+    --ag-accent: #c2410c; /* Lüks bir turuncu/kiremit rengi */
+    --ag-error: #dc2626;
+    --ag-success: #16a34a;
+  }
 
-/* ─── SEKTÖR İNCE AYARLARI ─── */
-/* Tema değişkenleri çoğu şeyi hallediyor; bunlar yalnızca sektöre özgü ufak dokunuşlar. */
+  html {
+    scroll-behavior: smooth;
+  }
 
-/* HORECA — kategori sidebar'ında daha sıcak fon, hero için italik tagline */
-html[data-sector="horeca"] .ag-sidebar { background: #fff7ed; }
-html[data-sector="horeca"] .ag-hero p { font-style: italic; }
-html[data-sector="horeca"] .ag-card-title { font-family: var(--ag-font-heading); }
+  body {
+    @apply bg-[#fafafa] text-[#0f172a] antialiased selection:bg-slate-200 selection:text-slate-900;
+    font-family: var(--font-inter);
+    background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
 
-/* B2B — kompakt kart, dense grid */
-html[data-sector="b2b"] .ag-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; }
-html[data-sector="b2b"] .ag-card-body { padding: 0.75rem; }
-html[data-sector="b2b"] .ag-card-title { font-size: 0.9rem; }
-html[data-sector="b2b"] .ag-card-desc { font-size: 0.78rem; min-height: 2.2em; }
-html[data-sector="b2b"] .ag-card-price { font-size: 0.95rem; }
-html[data-sector="b2b"] .ag-hero { padding: 1.5rem 0 1rem; }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-playfair);
+    letter-spacing: -0.02em;
+  }
+}
 
-/* FASHION — keskin köşeler, büyük ürün görseli, üst harfli başlıklar */
-html[data-sector="fashion"] .ag-card,
-html[data-sector="fashion"] .ag-sidebar,
-html[data-sector="fashion"] .ag-product-detail,
-html[data-sector="fashion"] .ag-account-card,
-html[data-sector="fashion"] .ag-cart-summary { border-radius: 0; }
-html[data-sector="fashion"] .ag-card { border: 0; border-bottom: 1px solid var(--ag-border); }
-html[data-sector="fashion"] .ag-section-title { text-transform: uppercase; letter-spacing: 0.15em; font-weight: 400; }
-html[data-sector="fashion"] .ag-hero h1 { font-weight: 400; letter-spacing: 0.05em; }
-html[data-sector="fashion"] .ag-grid { gap: 2rem; }
-html[data-sector="fashion"] .ag-card-title { font-weight: 400; letter-spacing: 0.03em; }
-html[data-sector="fashion"] .ag-btn-primary { border-radius: 0; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; }
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+  }
+  
+  .glass-header {
+    @apply bg-white/70 backdrop-blur-lg border-b border-white/30 shadow-sm sticky top-0 z-50 transition-all duration-300;
+  }
+
+  .premium-shadow {
+    box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08);
+  }
+
+  .hover-elevate {
+    @apply transition-transform duration-500 ease-[cubic-bezier(0.33,1,0.68,1)] hover:-translate-y-2;
+  }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reveal {
+  0% { clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0% 100%); opacity: 0; transform: translateY(30px); }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 1; transform: translateY(0); }
+}
+
+
+/* ===================================================================
+   AYNA BILESEN KATMANI (.ag-*) -- c7481df commitinden geri yuklendi.
+   Tailwind v4 donusumunde kayboldu; sepet/checkout/form/hesap sayfalari
+   bu siniflara bagimli. --ag-* degiskenleri yukarida @layer base de tanimli.
+   =================================================================== */
 
 /* Helpers from earlier */
 .h-full { height: 100%; }
@@ -76,7 +111,7 @@ html[data-sector="fashion"] .ag-btn-primary { border-radius: 0; text-transform: 
 .ag-search button { background: var(--ag-primary); color: white; border: 0; padding: 0.55rem 1.2rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
 .ag-search button:hover:not(:disabled) { background: var(--ag-primary-hover); }
 .ag-search button:disabled { opacity: 0.6; }
-@media (max-width: 720px) { .ag-search { display: none; } }
+@media (max-width: 720px) { .ag-search { max-width: none; flex-basis: 100%; order: 3; } .ag-header-inner { flex-wrap: wrap; } }
 .ag-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.1rem; }
 .ag-brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--ag-primary); color: white; border-radius: 6px; font-weight: 700; }
 .ag-nav { display: flex; gap: 1.25rem; align-items: center; font-size: 0.95rem; }
@@ -134,7 +169,7 @@ html[data-sector="fashion"] .ag-btn-primary { border-radius: 0; text-transform: 
 .ag-product-price { font-size: 2rem; font-weight: 700; color: var(--ag-primary); margin: 0 0 1.5rem; }
 
 /* BUTTONS */
-.ag-btn-primary { background: var(--ag-primary); color: white; border: 0; padding: 0.75rem 1.5rem; border-radius: var(--ag-radius); font-weight: 600; font-size: 1rem; transition: background 0.15s; }
+.ag-btn-primary, a.ag-btn-primary, .ag-empty a.ag-btn-primary { background: var(--ag-primary); color: white; border: 0; padding: 0.75rem 1.5rem; border-radius: var(--ag-radius); font-weight: 600; font-size: 1rem; transition: background 0.15s; text-decoration: none; }
 .ag-btn-primary:hover:not(:disabled) { background: var(--ag-primary-hover); }
 .ag-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .ag-btn-full { width: 100%; margin-top: 1rem; }

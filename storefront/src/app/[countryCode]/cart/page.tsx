@@ -52,9 +52,13 @@ export default async function CartPage({
                         <span>Toplam</span>
                         <strong>{formatPrice(cart.total, cart.currency_code)}</strong>
                     </div>
-                    <button className="ag-btn-primary ag-btn-full" disabled>
-                        Ödemeye Geç (yakında)
-                    </button>
+                    <Link
+                        href={`/${countryCode}/checkout`}
+                        className="ag-btn-primary ag-btn-full"
+                        style={{ display: "block", textAlign: "center", marginTop: "1rem" }}
+                    >
+                        Güvenli Ödemeye Geç
+                    </Link>
                     <Link href={`/${countryCode}`} className="ag-link-back">
                         ← Alışverişe devam et
                     </Link>
