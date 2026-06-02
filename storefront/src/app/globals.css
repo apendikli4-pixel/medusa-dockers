@@ -32,6 +32,7 @@
     --ag-accent: #c2410c; /* Lüks bir turuncu/kiremit rengi */
     --ag-error: #dc2626;
     --ag-success: #16a34a;
+    --ag-on-primary: #ffffff; /* primary buton üstü metin — koyu primary'li temalar override eder */
   }
 
   html {
@@ -53,12 +54,25 @@
 }
 
 @layer utilities {
+  /* Cam efektleri tema-duyarlı: --ag-bg-card'a saydamlık katılır,
+     böylece koyu temalarda (vape/electronics) doğru koyu cam görünür. */
   .glass-panel {
-    @apply bg-white/80 backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+    background: color-mix(in srgb, var(--ag-bg-card) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ag-border) 60%, transparent);
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
-  
+
   .glass-header {
-    @apply bg-white/70 backdrop-blur-lg border-b border-white/30 shadow-sm sticky top-0 z-50 transition-all duration-300;
+    background: color-mix(in srgb, var(--ag-bg-card) 75%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--ag-border) 50%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    transition: all 0.3s;
   }
 
   .premium-shadow {
@@ -169,7 +183,7 @@
 .ag-product-price { font-size: 2rem; font-weight: 700; color: var(--ag-primary); margin: 0 0 1.5rem; }
 
 /* BUTTONS */
-.ag-btn-primary, a.ag-btn-primary, .ag-empty a.ag-btn-primary { background: var(--ag-primary); color: white; border: 0; padding: 0.75rem 1.5rem; border-radius: var(--ag-radius); font-weight: 600; font-size: 1rem; transition: background 0.15s; text-decoration: none; }
+.ag-btn-primary, a.ag-btn-primary, .ag-empty a.ag-btn-primary { background: var(--ag-primary); color: var(--ag-on-primary, #fff); border: 0; padding: 0.75rem 1.5rem; border-radius: var(--ag-radius); font-weight: 600; font-size: 1rem; transition: background 0.15s; text-decoration: none; }
 .ag-btn-primary:hover:not(:disabled) { background: var(--ag-primary-hover); }
 .ag-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .ag-btn-full { width: 100%; margin-top: 1rem; }
