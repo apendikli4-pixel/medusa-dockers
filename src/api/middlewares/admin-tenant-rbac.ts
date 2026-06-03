@@ -48,12 +48,13 @@ export const adminTenantRbac = async (
 
             // POST/PUT body filtrelerine ekle (ürün oluşturma/güncelleme)
             if (req.method === "POST" || req.method === "PUT") {
-                req.body = req.body || {}
+                const body = (req.body || {}) as Record<string, unknown>
                 
                 // Medusa V2'de ürün oluştururken sales_channels formatı [{id: "..."}] şeklindedir
-                if ((req.path.includes("/products") || req.path.includes("/orders")) && !(req.body as any).sales_channels) {
-                    (req.body as any).sales_channels = [{ id: salesChannelId }]
+                if ((req.path.includes("/products") || req.path.includes("/orders")) && !body.sales_channels) {
+                    body.sales_channels = [{ id: salesChannelId }]
                 }
+                req.body = body
             }
 
             logger.debug(`[AdminRBAC] Admin ${actorId} isteği SalesChannel ${salesChannelId} ile sınırlandırıldı.`)

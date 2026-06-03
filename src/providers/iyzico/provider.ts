@@ -9,6 +9,7 @@ import {
 // @ts-ignore — SDK yeni kuruldu, tip tanımı eksik olabilir
 import Iyzipay from "iyzipay"
 import { getClientIp } from "../../utils/get-client-ip"
+import { minorToMajorString } from "../../lib/money"
 import {
     Logger,
     ProviderWebhookPayload,
@@ -84,8 +85,8 @@ class IyzicoProvider extends AbstractPaymentProvider<IyzicoOptions> {
             const request = {
                 locale: Iyzipay.LOCALE.TR,
                 conversationId: paymentId,
-                price: (Number(amount) / 100).toString(), // Using simple division (adjust based on Medusa minor units)
-                paidPrice: (Number(amount) / 100).toString(),
+                price: minorToMajorString(amount),
+                paidPrice: minorToMajorString(amount),
                 currency: currency_code.toUpperCase() === "TRY" ? Iyzipay.CURRENCY.TRY : Iyzipay.CURRENCY[currency_code.toUpperCase()] || Iyzipay.CURRENCY.TRY,
                 basketId: (context as any).cart_id || `basket_${randomUUID()}`,
                 paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
@@ -127,7 +128,7 @@ class IyzicoProvider extends AbstractPaymentProvider<IyzicoOptions> {
                         category1: "Havuz Ürünleri",
                         category2: "Genel",
                         itemType: Iyzipay.BASKET_ITEM_TYPE.PHYSICAL,
-                        price: (Number(amount) / 100).toString()
+                        price: minorToMajorString(amount)
                     }
                 ]
             };
@@ -193,7 +194,7 @@ class IyzicoProvider extends AbstractPaymentProvider<IyzicoOptions> {
             conversationId: (input as any).id || randomUUID(),
             paymentId: input.data?.paymentId as string,
             ip: "127.0.0.1", // Admin/sistem operasyonu — müşteri IP'si gerekmez
-            price: ((input as any).amount ? (Number((input as any).amount) / 100).toString() : "0")
+            price: ((input as any).amount ? minorToMajorString((input as any).amount) : "0")
         }
 
         return new Promise((resolve, reject) => {
@@ -258,7 +259,7 @@ class IyzicoProvider extends AbstractPaymentProvider<IyzicoOptions> {
             locale: Iyzipay.LOCALE.TR,
             conversationId: input.data?.paymentId as string,
             paymentTransactionId: input.data?.transactionId as string, // İade için transactionId gerekir
-            price: (Number(input.amount) / 100).toString(),
+            price: minorToMajorString(input.amount),
             ip: "127.0.0.1" // Admin/sistem operasyonu — müşteri IP'si gerekmez
         }
 

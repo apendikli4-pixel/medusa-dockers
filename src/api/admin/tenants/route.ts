@@ -192,14 +192,13 @@ export const POST = async (
             })
         }
 
-        // Workflow non-Error fırlatabiliyor (compensation result vs.)
-        const errStr = error instanceof Error
-            ? `${error.message}\n${error.stack}`
-            : JSON.stringify(error, null, 2)
-        logger.error(`[Tenant API] Oluşturma hatası: ${errStr}`)
+        // Hataları sadece sunucu tarafına logla (GENESIS_PROTOCOL: No internal error leak)
+        const errorMessage = error instanceof Error ? error.message : "Bilinmeyen sunucu hatası"
+        logger.error(`[Tenant API] Oluşturma hatası: ${error instanceof Error ? error.stack : JSON.stringify(error)}`)
+        
         return res.status(500).json({
             error: "Mağaza oluşturulurken bir hata oluştu.",
-            debug: error instanceof Error ? error.message : String(error),
+            // Sızdırılan debug bilgisi silindi
         })
     }
 }

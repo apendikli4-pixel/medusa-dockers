@@ -35,8 +35,8 @@ export const Tenant = model.define("tenant", {
     /**
      * Mağazanın faaliyet gösterdiği sektör.
      * Geçerli değerler: 'retail' (perakende), 'horeca' (otel/restoran/cafe),
-     * 'b2b' (toptan satış), 'fashion' (moda/giyim).
-     * Sektöre göre farklı iş kuralları ve fiyatlama uygulanabilir.
+     * 'b2b' (toptan satış), 'fashion' (moda), 'electronics' (elektronik), 'vape' (elektronik sigara), 'pool' (havuz).
+     * Sektöre göre farklı AI araçları (tools) ve iş kuralları uygulanır.
      *
      * NOT: Medusa v2 DML'de enum tipi yoktur.
      * Değer doğrulaması servis katmanında Zod ile yapılır.

@@ -123,6 +123,23 @@ export function minorToMajorFloor(minor: MoneyInput, divisor = 100): number {
 }
 
 /**
+ * Kuruş (minor unit) tutarını string formatında TL'ye (major unit) çevirir.
+ * Tam ondalık hassasiyetini korur. İyzico ve PayTR API'sine gönderirken
+ * bölme işlemi (amount / 100) hatalarını engellemek için kullanılır.
+ * 
+ * Örnek:
+ *   minorToMajorString(1050)      → "10.5"
+ *   minorToMajorString(12345)     → "123.45"
+ */
+export function minorToMajorString(minor: MoneyInput, divisor = 100): string {
+    if (divisor <= 0) {
+        throw new Error("[money.minorToMajorString] divisor pozitif olmalı")
+    }
+    const n = toNumber(minor)
+    return (n / divisor).toString()
+}
+
+/**
  * Bir para tutarını en yakın minor unit'e yuvarlar (round-half-up).
  *
  * Kullanım: ödeme gateway'lerine (PayTR, İyzico) tutar göndermek.

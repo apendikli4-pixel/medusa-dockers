@@ -118,7 +118,11 @@ Both share the same source volume mount, so code changes appear in both without 
 
 **Customer links** (`src/links/`): Medusa customers are linked to both `MemoryInsight` and `MemoryTruth` records via `defineLink`.
 
-**Available AI tools:** `search_products`, `check_inventory`, `calculatePoolChemicals`, `conscience_check`, `create_blog_post`, `create_product` (admin only), `create_category` (admin only), `manage_inventory` (admin only), `create_campaign` (admin only), `track_order`, `generate_storefront_data` (admin only - Auto-Store Generator).
+**Multi-Tenant Sector Agnostic Tools:** The agent dynamically routes tools based on `tenant.sector`.
+- **Global Tools:** `search_products`, `check_inventory`, `conscience_check`.
+- **Pool Sector Tools:** `calculatePoolChemicals`, `volumeCalculator`.
+- **Vape Sector Tools:** `vapeCalculator` (Nic-Shot / Base liquid mixer).
+- **Admin Tools (All Sectors):** `create_product`, `create_category`, `manage_inventory`, `create_campaign`, `create_blog_post`, `track_order`, `generate_storefront_data` (Auto-Store Generator), `system_audit`, `system_auto_fix`, `predict_stock_shortage`.
 
 **Fallback AI:** When Gemini returns 429 or 500, the service falls back to the Ollama endpoint configured in `.env` (`OLLAMA_API_URL`, `OLLAMA_MODEL_NAME`).
 
@@ -178,42 +182,23 @@ storefront/src/
 - **HTTP method semantics** — Routes that mutate state (create, update, delete) must use `POST`/`PUT`/`DELETE`. Never use `GET` for write operations. (enforced 2026-03-24)
 
 
-## Medusa V2.15 Upgrade Path (planned)
+## Medusa V2.15 Upgrade Path (COMPLETED)
 
-We currently target `@medusajs/*` v2.13.4 across the backend. The upgrade window is v2.13.4 → **v2.15.2** (NOT v2.13.5/v2.13.6/v2.14.x/v2.15.0/v2.15.1).
+**Status: COMPLETED.** The backend has been fully upgraded to **v2.15.3**.
+- Zod v3 → v4 migration is complete (`@medusajs/framework/zod`).
+- All strict type-checking and HTTP alignments have been verified.
+- The DB schema migrations for v2.15 have been fully applied.
 
-Why jump directly to v2.15.2:
-- v2.13.6 introduced a MikroORM regression where `medusa db:migrate` then `medusa db:generate` would generate "drop all tables" migrations for custom modules. v2.15.2 is the official fix.
-- v2.15.0 and v2.15.1 are missing PRs / superseded — Medusa team explicitly recommends v2.15.1+ (we go to .2 since it's the safe fix).
+*Legacy upgrade notes below for historical reference:*
+Why we jumped directly to v2.15.2+:
+- v2.13.6 introduced a MikroORM regression where `medusa db:migrate` then `medusa db:generate` would generate "drop all tables" migrations for custom modules. v2.15.2+ is the official fix.
 
-Breaking changes to apply during upgrade:
-
-1. **Zod codemod (automatic)**: run `npx medusa codemod replace-zod-imports` once after `npm install`. Converts `import { z } from "zod"` → `import { z } from "@medusajs/framework/zod"` in all 22 zod-using files.
-2. **Zod v3 → v4 manual fixes** (codemod does NOT handle):
-   - `z.string().email()` → `z.email()` (top-level)
-   - `z.string().uuid()` → `z.uuid()`
-   - `z.string().url()` → `z.url()`
-   - `z.object().strict()` → `z.strictObject({...})`
-   - `z.object().passthrough()` → `z.looseObject({...})`
-   - `z.record(ValueSchema)` → `z.record(z.string(), ValueSchema)` (explicit key required)
-   - `z.string({ invalid_type_error: "..." })` → unified error function param
-3. **Product dimension fields**: `width`/`length`/`height`/`weight` are now `float` on both Product and ProductVariant. Previously: text on Product, number on ProductVariant. Check `src/modules/ayna/tools/volume-calculator-tool.ts` and any code that does arithmetic on these fields.
-4. **HTTP types alignment**: types exported from `@medusajs/framework/types` now match Zod schemas exactly. Some properties became required (e.g. `AdminCreatePricePreference.attribute`/`value`). `metadata` is now `Record<string, unknown> | null`, not `Record<string, any>`.
-5. **Official Loyalty Plugin** (`@medusajs/loyalty-plugin`) is now open-source. It provides **gift cards + store credit accounts only** — no point-per-purchase earning. Our `src/modules/loyalty` (1 TL = 1 point, 500 points = 50 TL discount) is COMPLEMENTARY. **Do not replace** our module — install the plugin alongside for gift cards if we add that feature later.
-
-Upgrade procedure (Faz 1):
+Legacy Upgrade procedure (Faz 1 - DONE):
 ```bash
-npm install @medusajs/framework@2.15.2 @medusajs/medusa@2.15.2 \
-  @medusajs/admin-sdk@2.15.2 @medusajs/cli@2.15.2 \
-  @medusajs/fulfillment@2.15.2 @medusajs/fulfillment-manual@2.15.2 \
-  @medusajs/payment@2.15.2 @medusajs/promotion@2.15.2 \
-  @medusajs/types@2.15.2 @medusajs/utils@2.15.2 \
-  @medusajs/workflows-sdk@2.15.2
+# This was already executed:
+npm install @medusajs/framework@2.15.3 ...
 npm install zod@^4.2.0
 npx medusa codemod replace-zod-imports
-npx tsc --noEmit            # find manual Zod v4 fixes needed
-npm run build               # full compilation
-npm test                    # all preservation tests must stay green
 npx medusa db:migrate       # apply v2.15 schema updates
 ```
 

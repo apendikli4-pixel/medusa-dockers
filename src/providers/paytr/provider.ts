@@ -8,7 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import crypto from "crypto"
 import { getClientIp } from "../../utils/get-client-ip"
-import { isValidAmount, roundToMinor } from "../../lib/money"
+import { isValidAmount, roundToMinor, minorToMajorString } from "../../lib/money"
 import {
     Logger,
     ProviderWebhookPayload,
@@ -122,7 +122,7 @@ class PayTRProvider extends AbstractPaymentProvider<PayTROptions> {
 
             // Build simple basket
             const user_basket = Buffer.from(JSON.stringify([
-                ["Siparis Odemesi", (payment_amount / 100).toString(), 1]
+                ["Siparis Odemesi", minorToMajorString(amount), 1]
             ])).toString("base64")
 
             const timeout_limit = "30"
