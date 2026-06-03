@@ -69,6 +69,30 @@ export default class AynaService extends MedusaService({
     }
 
     /**
+     * Blog/SEO içerik üretimi — chat akışından bağımsız, doğrudan AI provider.
+     *
+     * processMessage chat odaklıdır (guardian prompt, tool çağrıları, hafıza);
+     * blog için bunlara gerek yok. Bu metod düşük temperature (tutarlı, az
+     * halüsinasyon) + yüksek token limiti ile temiz uzun-form içerik üretir.
+     *
+     * @returns üretilen markdown metni (boşsa hata fırlatır)
+     */
+    async generateBlogContent(
+        prompt: string,
+        opts?: { temperature?: number; maxTokens?: number }
+    ): Promise<string> {
+        const res = await this.hybridAIProvider_.generateText(prompt, {
+            temperature: opts?.temperature ?? 0.4,
+            maxTokens: opts?.maxTokens ?? 1200,
+        })
+        const text = (res?.text || "").trim()
+        if (!text) {
+            throw new Error("AI boş içerik döndürdü")
+        }
+        return text
+    }
+
+    /**
      * Dürüstlük kaydı — Alt servise delege edildi
      */
     async recordTruth(actor: string, action: string, data: any): Promise<any> {

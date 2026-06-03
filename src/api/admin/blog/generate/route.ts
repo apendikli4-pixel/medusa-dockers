@@ -75,14 +75,23 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         try {
             const ayna = req.scope.resolve("ayna") as any
             const prompt =
-                `Sen bir SEO uzmanı içerik yazarısın. Aşağıdaki başlık için Türkçe, ` +
-                `SEO uyumlu, markdown formatında, 200-300 kelimelik özlü bir blog yazısı yaz. ` +
-                `2-3 alt başlık (##) ve kısa paragraflar kullan. ` +
-                (keywords.length ? `Şu anahtar kelimeleri doğal şekilde geçir: ${keywords.join(", ")}. ` : "") +
-                `\n\nBaşlık: "${title}"`
+                `Görev: Aşağıdaki başlık için kısa ve profesyonel bir Türkçe blog yazısı yaz.\n\n` +
+                `KURALLAR:\n` +
+                `- SADECE Türkçe yaz. İngilizce kelime KULLANMA.\n` +
+                `- Markdown kullan: 2 adet "## Alt Başlık" ve her birinin altında 1 paragraf.\n` +
+                `- Toplam 120-180 kelime. Akıcı, bilgilendirici, doğal dil.\n` +
+                `- Aynı cümleyi TEKRARLAMA. Her bölüm farklı bilgi versin.\n` +
+                (keywords.length
+                    ? `- Şu anahtar kelimeleri doğal biçimde geçir: ${keywords.join(", ")}.\n`
+                    : "") +
+                `\nBAŞLIK: ${title}\n\nYAZI:`
 
-            const result = await ayna.processMessage(prompt, { isAdmin: true })
-            const aiText = result?.response || ""
+            // Blog'a özel: düşük temperature (tutarlı), guardian/tool yükü yok.
+            // maxTokens düşük tutuldu — yavaş CPU inference'ta timeout riskini azaltır.
+            const aiText = await ayna.generateBlogContent(prompt, {
+                temperature: 0.4,
+                maxTokens: 600,
+            })
 
             if (!aiText || aiText.length < 50) {
                 throw new Error("AI boş veya çok kısa içerik döndürdü")
