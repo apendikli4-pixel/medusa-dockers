@@ -41,8 +41,9 @@ export const storefrontTenantScoper = async (
 
                 // POST istekleri için body'ye enjekte et (sepet oluşturma vb.)
                 if (req.method === "POST" || req.method === "PUT") {
-                    req.body = req.body || {}
-                    ;(req.body as any).sales_channel_id = salesChannelId
+                    const body = (req.body || {}) as Record<string, unknown>
+                    body.sales_channel_id = salesChannelId
+                    req.body = body
                 }
                 
                 logger.debug(`[StorefrontScoper] SalesChannel (${salesChannelId}) enjekte edildi.`)

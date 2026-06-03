@@ -1,4 +1,5 @@
 import { formatPrice } from "@/lib/format"
+import Image from "next/image"
 import type { CheckoutCart } from "@/lib/server/checkout"
 
 /**
@@ -13,9 +14,15 @@ export default function CheckoutSummary({ cart }: { cart: CheckoutCart }) {
             <ul className="ag-checkout-items">
                 {cart.items.map((it) => (
                     <li key={it.id} className="ag-checkout-item">
-                        <div className="ag-checkout-thumb">
+                        <div className="ag-checkout-thumb relative w-12 h-12">
                             {it.thumbnail ? (
-                                <img src={it.thumbnail} alt={it.title} />
+                                <Image 
+                                    src={it.thumbnail} 
+                                    alt={it.title} 
+                                    fill
+                                    className="object-cover rounded"
+                                    sizes="48px"
+                                />
                             ) : (
                                 <span className="ag-checkout-thumb-ph">📦</span>
                             )}

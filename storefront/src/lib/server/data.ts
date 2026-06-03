@@ -3,6 +3,7 @@
  * Tüm /store/* çağrıları sunucu tarafında, publishable key + region scope ile.
  */
 import "server-only"
+import { unstable_cache } from "next/cache"
 import { sdk } from "../medusa-client"
 
 const DEFAULT_REGION_NAME = process.env.NEXT_PUBLIC_DEFAULT_REGION_NAME || "Miror-Core"
@@ -33,19 +34,23 @@ export type StoreRegion = {
 /**
  * Aktif region'u getirir (default: env tabanlı, yoksa ilk region).
  */
-export async function getDefaultRegion(): Promise<StoreRegion | null> {
-    try {
-        const { regions } = await sdk.store.region.list({ fields: "id,name,currency_code,countries.iso_2,countries.name" })
-        if (!regions?.length) return null
-        const match = regions.find(
-            (r: { name?: string }) => r.name === DEFAULT_REGION_NAME
-        )
-        return (match || regions[0]) as StoreRegion
-    } catch (err) {
-        console.error("[getDefaultRegion]", err)
-        return null
-    }
-}
+export const getDefaultRegion = unstable_cache(
+    async (): Promise<StoreRegion | null> => {
+        try {
+            const { regions } = await sdk.store.region.list({ fields: "id,name,currency_code,countries.iso_2,countries.name" })
+            if (!regions?.length) return null
+            const match = regions.find(
+                (r: { name?: string }) => r.name === DEFAULT_REGION_NAME
+            )
+            return (match || regions[0]) as StoreRegion
+        } catch (err) {
+            console.error("[getDefaultRegion]", err)
+            return null
+        }
+    },
+    ["medusa-default-region"],
+    { revalidate: 60, tags: ["regions"] }
+)
 
 /**
  * Ürün listesi — region'a göre fiyatlandırılmış.
@@ -54,37 +59,41 @@ export async function getDefaultRegion(): Promise<StoreRegion | null> {
  *   categoryId: tek kategori
  *   categoryHandle: handle ile filtre (önce id'ye dönüştürülür)
  */
-export async function listProducts(opts: {
-    limit?: number
-    q?: string
-    categoryId?: string
-    categoryHandle?: string
-} = {}): Promise<StoreProduct[]> {
-    const region = await getDefaultRegion()
-    if (!region) return []
+export const listProducts = unstable_cache(
+    async (opts: {
+        limit?: number
+        q?: string
+        categoryId?: string
+        categoryHandle?: string
+    } = {}): Promise<StoreProduct[]> => {
+        const region = await getDefaultRegion()
+        if (!region) return []
 
-    let categoryId = opts.categoryId
-    if (!categoryId && opts.categoryHandle) {
-        const cat = await getCategoryByHandle(opts.categoryHandle)
-        categoryId = cat?.id
-    }
-
-    try {
-        const query: Record<string, unknown> = {
-            region_id: region.id,
-            limit: opts.limit ?? 24,
-            fields: "id,title,handle,description,thumbnail,*variants.calculated_price",
+        let categoryId = opts.categoryId
+        if (!categoryId && opts.categoryHandle) {
+            const cat = await getCategoryByHandle(opts.categoryHandle)
+            categoryId = cat?.id
         }
-        if (opts.q && opts.q.trim()) query.q = opts.q.trim()
-        if (categoryId) query.category_id = [categoryId]
 
-        const { products } = await sdk.store.product.list(query)
-        return (products as unknown) as StoreProduct[]
-    } catch (err) {
-        console.error("[listProducts]", err)
-        return []
-    }
-}
+        try {
+            const query: Record<string, unknown> = {
+                region_id: region.id,
+                limit: opts.limit ?? 24,
+                fields: "id,title,handle,description,thumbnail,*variants.calculated_price",
+            }
+            if (opts.q && opts.q.trim()) query.q = opts.q.trim()
+            if (categoryId) query.category_id = [categoryId]
+
+            const { products } = await sdk.store.product.list(query)
+            return (products as unknown) as StoreProduct[]
+        } catch (err) {
+            console.error("[listProducts]", err)
+            return []
+        }
+    },
+    ["medusa-list-products"],
+    { revalidate: 60, tags: ["products"] }
+)
 
 export type StoreCategory = {
     id: string
@@ -95,35 +104,43 @@ export type StoreCategory = {
 /**
  * Tüm kategoriler — sidebar/dropdown için.
  */
-export async function listCategories(): Promise<StoreCategory[]> {
-    try {
-        const { product_categories } = await sdk.store.category.list({
-            fields: "id,name,handle",
-            limit: 50,
-        })
-        return (product_categories as unknown) as StoreCategory[]
-    } catch (err) {
-        console.error("[listCategories]", err)
-        return []
-    }
-}
+export const listCategories = unstable_cache(
+    async (): Promise<StoreCategory[]> => {
+        try {
+            const { product_categories } = await sdk.store.category.list({
+                fields: "id,name,handle",
+                limit: 50,
+            })
+            return (product_categories as unknown) as StoreCategory[]
+        } catch (err) {
+            console.error("[listCategories]", err)
+            return []
+        }
+    },
+    ["medusa-list-categories"],
+    { revalidate: 60, tags: ["categories"] }
+)
 
 /**
  * Tek kategori (handle ile).
  */
-export async function getCategoryByHandle(handle: string): Promise<StoreCategory | null> {
-    try {
-        const { product_categories } = await sdk.store.category.list({
-            handle,
-            limit: 1,
-            fields: "id,name,handle",
-        })
-        return ((product_categories?.[0] as unknown) as StoreCategory) || null
-    } catch (err) {
-        console.error("[getCategoryByHandle]", err)
-        return null
-    }
-}
+export const getCategoryByHandle = unstable_cache(
+    async (handle: string): Promise<StoreCategory | null> => {
+        try {
+            const { product_categories } = await sdk.store.category.list({
+                handle,
+                limit: 1,
+                fields: "id,name,handle",
+            })
+            return ((product_categories?.[0] as unknown) as StoreCategory) || null
+        } catch (err) {
+            console.error("[getCategoryByHandle]", err)
+            return null
+        }
+    },
+    ["medusa-get-category"],
+    { revalidate: 60, tags: ["categories"] }
+)
 
 /**
  * Tek ürün (handle ile).

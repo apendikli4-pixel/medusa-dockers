@@ -1,7 +1,33 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { getProductByHandle, formatPrice } from "@/lib/server/data"
 import AddToCartButton from "@/components/AddToCartButton"
+
+import { Metadata } from "next"
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ handle: string }>
+}): Promise<Metadata> {
+    const { handle } = await params
+    const product = await getProductByHandle(handle)
+
+    if (!product) {
+        return { title: "Ürün Bulunamadı" }
+    }
+
+    return {
+        title: `${product.title} | Ayna Genesis`,
+        description: product.description || `${product.title} satın al.`,
+        openGraph: {
+            title: product.title,
+            description: product.description || "",
+            images: product.thumbnail ? [product.thumbnail] : [],
+        },
+    }
+}
 
 export default async function ProductDetailPage({
     params,
@@ -15,28 +41,98 @@ export default async function ProductDetailPage({
     const variant = product.variants?.[0]
     const price = variant?.calculated_price
 
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.title,
+        image: product.thumbnail ? [product.thumbnail] : [],
+        description: product.description || "",
+        offers: {
+            "@type": "Offer",
+            price: price?.calculated_amount || 0,
+            priceCurrency: price?.currency_code?.toUpperCase() || "TRY",
+            availability: "https://schema.org/InStock"
+        }
+    }
+
     return (
-        <main className="ag-page">
-            <Link href={`/${countryCode}`} className="ag-back">← Ürünlere dön</Link>
-            <section className="ag-product-detail">
-                <div className="ag-product-img">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-24">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <Link href={`/${countryCode}`} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 mb-8 transition-colors">
+                ← Geri Dön
+            </Link>
+            
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
+                {/* Sol Taraf: Görsel */}
+                <div className="relative aspect-[4/5] md:aspect-square bg-gray-50 rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
                     {product.thumbnail ? (
-                        <img src={product.thumbnail} alt={product.title} />
+                        <Image 
+                            src={product.thumbnail} 
+                            alt={product.title} 
+                            fill
+                            priority
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                        />
                     ) : (
-                        <div className="ag-product-placeholder">{product.title.charAt(0)}</div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                            <span className="text-8xl font-heading font-bold text-gray-300">
+                                {product.title.charAt(0)}
+                            </span>
+                        </div>
                     )}
                 </div>
-                <div className="ag-product-info">
-                    <h1>{product.title}</h1>
-                    <p className="ag-product-desc">{product.description || "Açıklama eklenmemiş."}</p>
-                    <div className="ag-product-price">
+                
+                {/* Sağ Taraf: Ürün/Villa Bilgileri */}
+                <div className="flex flex-col pt-4 md:pt-8">
+                    <h1 className="text-3xl md:text-4xl font-heading font-bold text-gray-900 mb-4 tracking-tight">
+                        {product.title}
+                    </h1>
+                    
+                    <div className="text-2xl font-semibold text-[var(--ag-primary)] mb-6 pb-6 border-b border-gray-100">
                         {price ? formatPrice(price.calculated_amount, price.currency_code) : "Fiyat yok"}
                     </div>
-                    {variant ? (
-                        <AddToCartButton variantId={variant.id} />
-                    ) : (
-                        <p className="ag-error">Varyant tanımlanmamış</p>
-                    )}
+                    
+                    <div className="prose prose-gray mb-8">
+                        <p className="text-gray-600 leading-relaxed text-lg">
+                            {product.description || "Açıklama eklenmemiş."}
+                        </p>
+                    </div>
+                    
+                    {/* Villa & Rezervasyon / E-ticaret Ayrımı */}
+                    <div className="mt-auto pt-8">
+                        {variant ? (
+                            <div className="flex flex-col gap-4">
+                                {/* Eğer villa teması aktifse Rezervasyon takvimi gösterilecek */}
+                                <div className="hidden group-[html[data-sector='villa']]:block bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-4">
+                                    <h3 className="font-semibold text-gray-900 mb-4">Rezervasyon Yap</h3>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Giriş Tarihi</label>
+                                            <input type="date" className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-[var(--ag-primary)] focus:border-transparent outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Çıkış Tarihi</label>
+                                            <input type="date" className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-[var(--ag-primary)] focus:border-transparent outline-none transition-all" />
+                                        </div>
+                                    </div>
+                                    <button className="w-full py-4 px-8 bg-[var(--ag-primary)] hover:bg-[var(--ag-primary-hover)] text-white rounded-xl font-medium shadow-md shadow-[var(--ag-primary)]/20 transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2">
+                                        Müsaitliği Kontrol Et & Kirala
+                                    </button>
+                                </div>
+                                
+                                {/* Aksi halde standart sepete ekle (display logic css ile çözüldü) */}
+                                <div className="block group-[html[data-sector='villa']]:hidden">
+                                    <AddToCartButton variantId={variant.id} />
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-red-500 bg-red-50 p-4 rounded-xl border border-red-100 font-medium">Varyant tanımlanmamış</p>
+                        )}
+                    </div>
                 </div>
             </section>
         </main>

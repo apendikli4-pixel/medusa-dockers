@@ -1,6 +1,7 @@
 "use client"
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { updateLineAction, removeLineAction } from "@/actions/cart"
 
 export default function CartItem({
@@ -25,8 +26,18 @@ export default function CartItem({
 
     return (
         <div className="ag-cart-row">
-            <div className="ag-cart-thumb">
-                {thumbnail ? <img src={thumbnail} alt={title} /> : <div className="ag-cart-thumb-ph">{title.charAt(0)}</div>}
+            <div className="ag-cart-thumb relative w-16 h-16">
+                {thumbnail ? (
+                    <Image 
+                        src={thumbnail} 
+                        alt={title} 
+                        fill
+                        className="object-cover rounded"
+                        sizes="64px"
+                    />
+                ) : (
+                    <div className="ag-cart-thumb-ph">{title.charAt(0)}</div>
+                )}
             </div>
             <div className="ag-cart-info">
                 <h4>{title}</h4>
