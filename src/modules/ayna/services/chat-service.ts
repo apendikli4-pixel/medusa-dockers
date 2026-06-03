@@ -9,13 +9,70 @@ import { N8nBridgeService } from "../../../lib/n8n-bridge"
 // Import injection detector service
 import InjectionDetectorService from "../../../modules/conscience/services/injection-detector.service"
 
-// Tool definitions (Importing placeholders for context)
 import { volumeCalculatorTool } from "../tools/volume-calculator-tool"
 import { productSearchTool } from "../tools/product-tool"
 import { inventoryCheckTool } from "../tools/inventory-tool"
 import { conscienceTool } from "../tools/conscience-tool"
+import { poolCalculatorTool } from "../tools/pool-calculator-tool"
+import { campaignTool } from "../tools/campaign-tool"
+import { categoryTool } from "../tools/category-tool"
+import { contentCreatorTool } from "../tools/content-creator-tool"
+import { inventoryManagerTool } from "../tools/inventory-manager-tool"
+import { quickOrderTool } from "../tools/order-tool"
+import { productCreateTool } from "../tools/product-create-tool"
+import { storeGeneratorTool } from "../tools/store-generator-tool"
+import { vapeCalculatorTool } from "../tools/vape-calculator-tool"
+import { sizeGuideTool } from "../tools/size-guide-tool"
+import { deviceCompatibilityTool } from "../tools/device-compatibility-tool"
+import { villaSearchTool } from "../tools/villa-search-tool"
 
-const STORE_TOOLS = [volumeCalculatorTool, productSearchTool, inventoryCheckTool, conscienceTool]
+// Statik diziler kaldırıldı. Dinamik oluşturucu fonksiyon:
+function getToolsForSector(sector: string, isAdmin: boolean) {
+    const baseStoreTools = [productSearchTool, inventoryCheckTool, conscienceTool]
+    let sectorTools: any[] = []
+
+    switch (sector.toLowerCase()) {
+        case "pool":
+            sectorTools = [poolCalculatorTool, volumeCalculatorTool]
+            break
+        case "vape":
+            sectorTools = [vapeCalculatorTool]
+            break
+        case "retail":
+        case "universal":
+        case "b2b":
+            sectorTools = [volumeCalculatorTool]
+            break
+        case "fashion":
+            sectorTools = [sizeGuideTool]
+            break
+        case "electronics":
+            sectorTools = [deviceCompatibilityTool]
+            break
+        case "villa":
+            sectorTools = [villaSearchTool]
+            break
+        default:
+            break
+    }
+
+    const storeTools = [...baseStoreTools, ...sectorTools]
+
+    if (isAdmin) {
+        return [
+            ...storeTools,
+            campaignTool,
+            categoryTool,
+            contentCreatorTool,
+            inventoryManagerTool,
+            quickOrderTool,
+            productCreateTool,
+            storeGeneratorTool
+        ]
+    }
+    
+    return storeTools
+}
 
 type InjectedDependencies = {
     logger: Logger
@@ -90,6 +147,8 @@ export default class AynaChatService {
                 if (data && data.length > 0) {
                     const t = data[0];
                     tenantContext = `Mağaza: ${t.name}. Sektör: ${t.sector}. Ayarlar: ${JSON.stringify(t.settings || {})}`;
+                    // Dinamik araçlar için sektör bilgisini options'a aktar
+                    options.tenantSector = t.sector || "retail";
                 }
             } catch (e) {
                 this.logger_.warn(`[AynaChat] Failed to fetch tenant context for ${options.tenantId}`);
@@ -184,11 +243,15 @@ export default class AynaChatService {
             }
         }
 
-        // Prepare generation options
+        // Prepare generation options dynamically based on tenant sector
+        const sector = options.tenantSector || "retail"
+        const dynamicTools = getToolsForSector(sector, isAdmin)
+        
         const genOptions = {
             temperature: 0.7,
             maxTokens: 1000,
-            responseFormat: "text" as const
+            responseFormat: "text" as const,
+            tools: dynamicTools
         }
 
         // 1. Get History/Insights
@@ -215,18 +278,43 @@ export default class AynaChatService {
         const fullPrompt = `${systemPrompt}\n\nTenant Context:\n${tenantContext}\n\nUser message: ${message}`
 
         // Generate response using hybrid AI provider
-        const aiResponse = await this.hybridAIProvider_.generateText(fullPrompt, genOptions)
-        const finalResponse = aiResponse.text
-
-        // 2. Tool Loop - We need to check if the response suggests using tools
-        // For simplicity, we'll check if the response contains certain patterns that indicate tool usage
-        // In a more sophisticated implementation, we'd use function calling capabilities
+        let aiResponse = await this.hybridAIProvider_.generateText(fullPrompt, genOptions)
+        let finalResponse = aiResponse.text || ""
         let toolUsed = false
-        // Simple check for tool usage patterns in response
-        if (finalResponse.includes("tool:") || finalResponse.includes("action:")) {
+
+        // 2. Tool Loop - Function Calling Execution
+        if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
             toolUsed = true
-            // Here we would normally parse and execute tools
-            // For now, we'll just note that tools might be used
+            this.logger_.info(`[AynaChat] Function calls detected: ${aiResponse.functionCalls.length}`)
+            
+            const toolResponses = []
+            
+            for (const call of aiResponse.functionCalls) {
+                const toolName = call.name
+                const toolArgs = call.args
+                
+                this.logger_.info(`[AynaChat] Executing tool: ${toolName}`)
+                
+                const toolResult = await this.toolService_.handleToolCall(toolName, toolArgs, {
+                    isAdmin,
+                    tenantId: options.tenantId,
+                    remoteQuery: options.remoteQuery,
+                    productModuleService: options.productModuleService,
+                    inventoryService: options.inventoryService,
+                    pricingModuleService: options.pricingModuleService,
+                    contentEngineService: options.contentEngineService,
+                })
+                
+                toolResponses.push({
+                    name: toolName,
+                    result: toolResult
+                })
+            }
+            
+            const followUpPrompt = `${fullPrompt}\n\n[SYSTEM (INTERNAL): You called one or more tools. Here are the JSON results of those tool calls: ${JSON.stringify(toolResponses)}.\nNow, provide your final natural language response to the user based on these results.]`
+            
+            aiResponse = await this.hybridAIProvider_.generateText(followUpPrompt, genOptions)
+            finalResponse = aiResponse.text || ""
         }
 
         // 3. Record Truth
