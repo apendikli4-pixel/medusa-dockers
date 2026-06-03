@@ -46,6 +46,7 @@ export interface AIProviderResponse {
   text: string
   providerUsed: "gemini" | "ollama"
   metadata?: Record<string, any>
+  functionCalls?: any[]
   usage?: {
     promptTokens: number
     completionTokens: number
@@ -60,6 +61,7 @@ export interface AIGenerateOptions {
   temperature?: number
   maxTokens?: number
   responseFormat?: "text" | "json"
+  tools?: any[]
 }
 
 /**
@@ -119,19 +121,32 @@ export class HybridAIProviderService {
     prompt: string,
     options: AIGenerateOptions = {}
   ): Promise<AIProviderResponse> {
-    const { temperature = 0.7, maxTokens = 1000, responseFormat = "text" } = options
+    const { temperature = 0.7, maxTokens = 1000, responseFormat = "text", tools } = options
     
     // Try Gemini first
     if (this.isGeminiAvailable()) {
       try {
         this.logger.debug("Hybrid AI Provider: Attempting Gemini text generation")
-        const result = await this.geminiModel.generateContent(prompt, {
-          temperature,
-          maxOutputTokens: maxTokens,
-        })
+        
+        const request: any = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature,
+                maxOutputTokens: maxTokens,
+            }
+        }
+        
+        if (tools && tools.length > 0) {
+            request.tools = [{ functionDeclarations: tools }]
+        }
+
+        const result = await this.geminiModel.generateContent(request)
 
         const response = await result.response
-        const text = response.text()
+        const functionCalls = response.functionCalls()
+        
+        // If function calls are returned, the text might be empty
+        const text = functionCalls?.length ? "" : response.text()
 
         // Extract token usage
         const usageMeta = result.usageMetadata()
@@ -142,6 +157,7 @@ export class HybridAIProviderService {
         return {
           text,
           providerUsed: "gemini",
+          functionCalls,
           metadata: { temperature, maxTokens, responseFormat },
           usage: { promptTokens, completionTokens, totalTokens }
         }
@@ -325,14 +341,26 @@ export class HybridAIProviderService {
     }
     
     try {
-      const response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(ollamaOptions)
-      })
-      
+      // AbortController ile timeout — yavaş CPU inference'ta sonsuz bekleme önlenir.
+      // OLLAMA_TIMEOUT_MS env ile ayarlanabilir (varsayılan 280sn).
+      const timeoutMs = parseInt(process.env.OLLAMA_TIMEOUT_MS || "280000", 10)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+      let response: Response
+      try {
+        response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(ollamaOptions),
+          signal: controller.signal
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+
       if (!response.ok) {
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
       }

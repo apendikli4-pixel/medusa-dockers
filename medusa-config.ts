@@ -63,6 +63,18 @@ export default defineConfig({
         backendUrl: process.env.MEDUSA_ADMIN_BACKEND_URL || "/",
     },
     modules: {
+        eventBus: {
+            resolve: "@medusajs/event-bus-redis",
+            options: {
+                redisUrl: process.env.REDIS_URL,
+            },
+        },
+        cacheService: {
+            resolve: "@medusajs/cache-redis",
+            options: {
+                redisUrl: process.env.REDIS_URL,
+            },
+        },
         file: {
             resolve: "@medusajs/file",
             options: {
@@ -93,9 +105,9 @@ export default defineConfig({
                     enabled: process.env.INJECTION_DETECTION_ENABLED !== "false",
                     riskThreshold: parseInt(process.env.INJECTION_RISK_THRESHOLD || "70", 10),
                     // Custom patterns to always block (in addition to built-in ones)
-                    blockList: process.env.INJECTION_BLOCK_LIST?.split(",") || [],
+                    blockList: process.env.INJECTION_BLOCK_LIST?.split(",") || ["ignore previous", "system prompt", "forget all", "override instructions", "bypass rules"],
                     // Custom patterns to always allow (even if they match block patterns)
-                    allowList: process.env.INJECTION_ALLOW_LIST?.split(",") || [],
+                    allowList: process.env.INJECTION_ALLOW_LIST?.split(",") || ["pool calculation", "chemical dose", "store policy"],
                 }
             }
         },
@@ -110,6 +122,12 @@ export default defineConfig({
         },
         tenant: {
             resolve: "./src/modules/tenant",
+        },
+        booking: {
+            resolve: "./src/modules/booking",
+        },
+        blog: {
+            resolve: "./src/modules/blog",
         },
         promotion: {
             resolve: "@medusajs/promotion",
