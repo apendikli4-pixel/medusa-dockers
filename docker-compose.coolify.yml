@@ -1,17 +1,50 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Coolify Production Deployment — Sadeleştirilmiş (6 servis)
+# ───────────────────────────────────────────────────────────────────────
+# Tek sunucu için: Redis Sentinel HA + n8n çıkarıldı (gereksiz karmaşıklık).
+# postgres + redis + meilisearch + medusa-server + medusa-worker + storefront
+#
+# Environment değişkenleri Coolify panelinden girilir (bkz. .env.coolify.example).
+# Backend: Dockerfile.production (multi-stage, npm run build)
+# Storefront: Dockerfile (dev mode — next dev; build backend bağımlılığı yok)
+# ═══════════════════════════════════════════════════════════════════════
 services:
   postgres:
     image: pgvector/pgvector:pg15
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-medusa-genesis}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-medusa_db_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medusa_db_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - medusa_network
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-R3d1sSecurePass2026}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-R3d1sSecurePass2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - medusa_network
 
   meilisearch:
     image: getmeili/meilisearch:v1.13
@@ -21,6 +54,8 @@ services:
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - meilisearch_data:/meili_data
+    networks:
+      - medusa_network
 
   medusa-server:
     build:
@@ -28,14 +63,19 @@ services:
       dockerfile: Dockerfile.production
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
-      - meilisearch
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    command: ["/bin/sh", "./start.sh"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://${POSTGRES_USER:-medusa_db_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-R3d1sSecurePass2026}@redis:6379
       MEDUSA_WORKER_MODE: server
+      DISABLE_MEDUSA_ADMIN: "false"
       JWT_SECRET: ${JWT_SECRET}
       COOKIE_SECRET: ${COOKIE_SECRET}
       STORE_CORS: ${STORE_CORS}
@@ -44,9 +84,17 @@ services:
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL_NAME: ${GEMINI_MODEL_NAME:-gemini-2.0-flash}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:7b}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-290000}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tnt_default}
+      N8N_BRIDGE_ENABLED: "false"
       NODE_OPTIONS: --max-old-space-size=4096
     ports:
       - "9000:9000"
+    networks:
+      - medusa_network
 
   medusa-worker:
     build:
@@ -54,41 +102,61 @@ services:
       dockerfile: Dockerfile.production
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
-      - meilisearch
-      - medusa-server
+      medusa-server:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["/bin/sh", "./start.sh"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://${POSTGRES_USER:-medusa_db_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-R3d1sSecurePass2026}@redis:6379
       MEDUSA_WORKER_MODE: worker
+      DISABLE_MEDUSA_ADMIN: "true"
       JWT_SECRET: ${JWT_SECRET}
       COOKIE_SECRET: ${COOKIE_SECRET}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:7b}
+      N8N_BRIDGE_ENABLED: "false"
       NODE_OPTIONS: --max-old-space-size=4096
+    networks:
+      - medusa_network
 
   storefront:
     build:
       context: ./storefront
-      dockerfile: Dockerfile.production
+      dockerfile: Dockerfile
     restart: unless-stopped
+    command: ["npm", "run", "dev"]
     depends_on:
-      - medusa-server
+      medusa-server:
+        condition: service_started
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       MEDUSA_BACKEND_URL: http://medusa-server:9000
-      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL}
-      NEXT_PUBLIC_SEARCH_ENDPOINT: ${NEXT_PUBLIC_SEARCH_ENDPOINT}
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${PUBLIC_BACKEND_URL}
+      NEXT_PUBLIC_SEARCH_ENDPOINT: ${PUBLIC_BACKEND_URL}
+      NEXT_PUBLIC_BASE_URL: ${PUBLIC_STOREFRONT_URL}
       NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
+      MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
     ports:
       - "8000:8000"
+    networks:
+      - medusa_network
 
 volumes:
   postgres_data:
+  redis_data:
   meilisearch_data:
+
+networks:
+  medusa_network:
+    driver: bridge
