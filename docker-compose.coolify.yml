@@ -91,8 +91,9 @@ services:
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tnt_default}
       N8N_BRIDGE_ENABLED: "false"
       NODE_OPTIONS: --max-old-space-size=4096
-    ports:
-      - "9000:9000"
+    # Coolify (Traefik) içeriden yönlendirir; host port bind ÇAKIŞMA yaratır.
+    expose:
+      - "9000"
     networks:
       - medusa_network
 
@@ -147,8 +148,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     networks:
       - medusa_network
 
