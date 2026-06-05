@@ -57,6 +57,47 @@ services:
     networks:
       - medusa_network
 
+  # ── Ollama: açık kaynak AI motoru (Gemini'nin yerine) ──
+  # Self-hosted, kota yok, veri dışarı çıkmaz. Modeller kalıcı volume'da tutulur.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - medusa_network
+
+  # ── Ollama model indirici (tek seferlik; idempotent — model varsa atlar) ──
+  # Deploy sırasında qwen2.5:14b + nomic-embed-text modellerini otomatik çeker.
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[ollama-init] Ollama sunucusu bekleniyor...";
+        until ollama list >/dev/null 2>&1; do sleep 3; done;
+        echo "[ollama-init] qwen2.5:14b indiriliyor (ilk seferde ~9GB)...";
+        ollama pull qwen2.5:14b;
+        echo "[ollama-init] nomic-embed-text indiriliyor...";
+        ollama pull nomic-embed-text;
+        echo "[ollama-init] Modeller hazir.";
+    restart: "no"
+    networks:
+      - medusa_network
+
   medusa-server:
     build:
       context: .
@@ -68,6 +109,8 @@ services:
       redis:
         condition: service_healthy
       meilisearch:
+        condition: service_started
+      ollama:
         condition: service_started
     command: ["/bin/sh", "./start.sh"]
     environment:
@@ -83,7 +126,7 @@ services:
       AUTH_CORS: ${AUTH_CORS}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://ollama:11434}
       OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-290000}
@@ -108,6 +151,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     command: ["/bin/sh", "./start.sh"]
     environment:
       NODE_ENV: production
@@ -119,7 +164,7 @@ services:
       COOKIE_SECRET: ${COOKIE_SECRET}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://ollama:11434}
       OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       NODE_OPTIONS: --max-old-space-size=4096
@@ -156,6 +201,7 @@ volumes:
   postgres_data:
   redis_data:
   meilisearch_data:
+  ollama_data:
 
 networks:
   medusa_network:
