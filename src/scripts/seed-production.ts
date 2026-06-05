@@ -168,7 +168,7 @@ export default async function seedProduction({ container }: ExecArgs) {
 
     // ─── 7. Kategoriler ───
     const { data: existingCats } = await query.graph({ entity: "product_category", fields: ["id", "name"] })
-    let categories = existingCats
+    let categories: any[] = existingCats
     if (!existingCats.length) {
         const { result } = await createProductCategoriesWorkflow(container).run({
             input: { product_categories: [
@@ -177,7 +177,7 @@ export default async function seedProduction({ container }: ExecArgs) {
                 { name: "Temizlik Ekipmanları", is_active: true },
             ] },
         })
-        categories = result
+        categories = result as any[]
         logger.info(`✅ ${result.length} kategori oluşturuldu`)
     } else {
         logger.info(`✅ Kategoriler (mevcut): ${existingCats.length}`)
