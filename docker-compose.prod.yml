@@ -107,10 +107,9 @@ services:
       AUTH_CORS: ${AUTH_CORS}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OLLAMA_API_URL: ${OLLAMA_API_URL:-}
-      N8N_BRIDGE_ENABLED: ${N8N_BRIDGE_ENABLED:-false}
-      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       NODE_OPTIONS: --max-old-space-size=4096
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
@@ -145,8 +144,9 @@ services:
       COOKIE_SECRET: ${COOKIE_SECRET}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      OLLAMA_API_URL: ${OLLAMA_API_URL:-}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       NODE_OPTIONS: --max-old-space-size=4096
     networks:
       - genesis_prod_network
@@ -166,7 +166,6 @@ services:
       NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL}
       NEXT_PUBLIC_SEARCH_ENDPOINT: ${NEXT_PUBLIC_SEARCH_ENDPOINT}
       NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
     healthcheck:

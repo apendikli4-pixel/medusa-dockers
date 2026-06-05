@@ -1,11 +1,29 @@
 
 import { createWorkflow, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector"
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai"
+import { Embeddings } from "@langchain/core/embeddings"
 import { Document } from "@langchain/core/documents"
 import { PoolConfig } from "pg"
+import { ollamaEmbed } from "../lib/ollama-client"
+
+/**
+ * OllamaEmbeddings — LangChain Embeddings arayüzünü Ollama (nomic-embed-text)
+ * ile uygular. Gemini (GoogleGenerativeAIEmbeddings) kaldırıldı.
+ */
+class OllamaEmbeddings extends Embeddings {
+    constructor() {
+        super({})
+    }
+    async embedQuery(text: string): Promise<number[]> {
+        return ollamaEmbed(text)
+    }
+    async embedDocuments(texts: string[]): Promise<number[][]> {
+        const out: number[][] = []
+        for (const t of texts) out.push(await ollamaEmbed(t))
+        return out
+    }
+}
 
 // Type definition for step input
 type ProductInput = {
@@ -16,37 +34,22 @@ type ProductInput = {
     material?: string
 }
 
-// ADIM 1: Metni Vektöre Çevir (Embedding) - Gemini ile
+// ADIM 1: Metni Vektöre Çevir (Embedding) - Ollama ile
 const generateEmbeddingStep = createStep("generate-embedding", async (product: ProductInput, { container }) => {
-    // Access env via process (standard in Node) or config if needed. 
-    // Using process.env is fine in recent Medusa v2 if properly loaded.
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is missing in environment variables")
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey)
-
-    // Bağlam oluştur
     const textToEmbed = `
     Ürün: ${product.title}
     Açıklama: ${product.description || ''}
     Materyal: ${product.material || ''}
   `.trim()
 
-    // Gemini text-embedding-004 modeli
-    const model = genAI.getGenerativeModel({ model: "text-embedding-004" })
-    const result = await model.embedContent(textToEmbed)
-    const embedding = result.embedding
-
-    return new StepResponse(embedding.values)
+    const embedding = await ollamaEmbed(textToEmbed)
+    return new StepResponse(embedding)
 })
 
 // ADIM 2: Vektörü PGVector'a Yükle
 const uploadToPgVectorStep = createStep("upload-pgvector", async (input: { id: string, title: string, handle: string, embedding: number[] }, { container }) => {
     const databaseUrl = process.env.DATABASE_URL
-    const geminiKey = process.env.GEMINI_API_KEY
-    if (!databaseUrl || !geminiKey) return new StepResponse("skipped_no_config")
+    if (!databaseUrl) return new StepResponse("skipped_no_config")
 
     try {
         const config = {
@@ -63,10 +66,7 @@ const uploadToPgVectorStep = createStep("upload-pgvector", async (input: { id: s
             },
         }
 
-        const embeddings = new GoogleGenerativeAIEmbeddings({
-            apiKey: geminiKey,
-            model: "text-embedding-004",
-        })
+        const embeddings = new OllamaEmbeddings()
 
         const vectorStore = await PGVectorStore.initialize(embeddings, config)
 
@@ -102,7 +102,7 @@ const uploadToPgVectorStep = createStep("upload-pgvector", async (input: { id: s
             postgresConnectionOptions: { connectionString: databaseUrl, ssl: false } as PoolConfig,
             tableName: "langchain_pg_embedding",
         }
-        const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY })
+        const embeddings = new OllamaEmbeddings()
         const store = await PGVectorStore.initialize(embeddings, config)
         const logger = container.resolve("logger")
         await store.delete({ ids: [productId] })

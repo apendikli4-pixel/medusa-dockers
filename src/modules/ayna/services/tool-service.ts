@@ -1,6 +1,6 @@
 import { Logger, RemoteQueryFunction } from "@medusajs/framework/types"
-import { GoogleGenerativeAI } from "@google/generative-ai"
-import { AI_CONFIG } from "../../../lib/ai-config"
+import { Modules } from "@medusajs/framework/utils"
+import { ollamaGenerate } from "../../../lib/ollama-client"
 import AynaMemoryService from "./memory-service"
 import AynaDiagnosticService from "./diagnostic-service"
 import AynaStockIntelligenceService from "./stock-intelligence-service"
@@ -17,17 +17,12 @@ export default class AynaToolService {
     protected memoryService_: AynaMemoryService
     protected diagnosticService_: AynaDiagnosticService
     protected stockIntelligenceService_: AynaStockIntelligenceService
-    protected genAI_: GoogleGenerativeAI | null = null
 
     constructor({ logger, aynaMemoryService, aynaDiagnosticService, aynaStockIntelligenceService }: InjectedDependencies) {
         this.logger_ = logger
         this.memoryService_ = aynaMemoryService
         this.diagnosticService_ = aynaDiagnosticService
         this.stockIntelligenceService_ = aynaStockIntelligenceService
-        const apiKey = process.env.GEMINI_API_KEY
-        if (apiKey) {
-            this.genAI_ = new GoogleGenerativeAI(apiKey)
-        }
     }
 
     async handleToolCall(
@@ -330,16 +325,10 @@ export default class AynaToolService {
     }
 
     private async executeConscienceCheck(args: Record<string, any>) {
-        if (!this.genAI_) return { verdict: "DENY", reasoning: "AI unavailable" }
-        
         try {
-            const model = this.genAI_.getGenerativeModel({
-                model: AI_CONFIG.geminiModel,
-                systemInstruction: "You are an ethical auditor for e-commerce. Response in JSON: {\"verdict\": \"ALLOW\"/\"DENY\", \"reasoning\": \"...\"}"
-            })
-            const prompt = `Action: ${args.action}\nContext: ${args.context}`
-            const result = await model.generateContent(prompt)
-            const text = result.response.text().replace(/```json|```/g, "").trim()
+            const prompt = `You are an ethical auditor for e-commerce. Respond ONLY in JSON: {"verdict": "ALLOW"/"DENY", "reasoning": "..."}\n\nAction: ${args.action}\nContext: ${args.context}`
+            const raw = await ollamaGenerate(prompt, { temperature: 0.2, json: true })
+            const text = raw.replace(/```json|```/g, "").trim()
             const parsed = JSON.parse(text)
 
             await this.memoryService_.recordTruth("system", `conscience_${parsed.verdict.toLowerCase()}`, {
@@ -474,16 +463,93 @@ export default class AynaToolService {
                 if (items.length > 0) {
                     await services.inventoryService.updateInventoryItems([{
                         id: items[0].id,
-                        // stocked_quantity güncelleme
+                        stocked_quantity: value,
                     }])
+                    await this.memoryService_.recordTruth("admin", "stock_updated", {
+                        productId, newStockValue: value, tenantId: services.tenantId || null,
+                    })
                     return { success: true, action: "update_stock", productId, newValue: value }
                 }
                 return { error: "Stok kaydı bulunamadı." }
             }
 
-            if (action === "update_price" && services.pricingModuleService) {
-                // Fiyat güncelleme mantığı
-                return { success: true, action: "update_price", productId, newValue: value, note: "Fiyat güncelleme Admin UI'dan yapılmalıdır." }
+            if (action === "update_price") {
+                if (!services.pricingModuleService) return { error: "Pricing service unavailable" }
+                if (!services.remoteQuery) return { error: "Query service unavailable" }
+
+                // 1. Ürünün varyantlarını ve price_set bilgilerini al
+                const { data: products } = await (services.remoteQuery as any).graph({
+                    entity: "product",
+                    fields: [
+                        "variants.id",
+                        "variants.title",
+                        "variants.price_set.id",
+                        "variants.price_set.prices.id",
+                        "variants.price_set.prices.amount",
+                        "variants.price_set.prices.currency_code",
+                    ],
+                    filters: { id: productId },
+                })
+
+                if (!products?.length || !products[0].variants?.length) {
+                    return { error: "Ürün veya varyant bulunamadı." }
+                }
+
+                const variant = products[0].variants[0]
+                const priceSet = variant.price_set
+
+                if (!priceSet) {
+                    // Price set yoksa yeni oluştur ve varyanta bağla
+                    const [newPriceSet] = await services.pricingModuleService.createPriceSets([{
+                        prices: [{ amount: value, currency_code: "try" }],
+                    }])
+                    // RemoteLink ile varyant-priceSet bağlantısı kur
+                    if ((services as any).remoteLink) {
+                        try {
+                            await (services as any).remoteLink.create({
+                                [Modules.PRODUCT]: { variant_id: variant.id },
+                                [Modules.PRICING]: { price_set_id: newPriceSet.id },
+                            })
+                        } catch (linkErr: any) {
+                            this.logger_.warn(`[AynaTool] Variant-PriceSet link hatası: ${linkErr.message}`)
+                        }
+                    }
+                    await this.memoryService_.recordTruth("admin", "price_created", {
+                        productId, variantId: variant.id, amount: value, currency: "TRY",
+                        tenantId: services.tenantId || null,
+                    })
+                    return { success: true, action: "update_price", productId, newValue: value, currency: "TRY", note: "Yeni fiyat seti oluşturuldu ve varyanta bağlandı." }
+                }
+
+                // 2. Mevcut TRY fiyatını bul
+                const existingPrice = priceSet.prices?.find((p: any) => p.currency_code === "try")
+
+                if (existingPrice) {
+                    // 3a. Mevcut fiyatı güncelle
+                    const oldAmount = existingPrice.amount
+                    await services.pricingModuleService.updatePrices([{
+                        id: existingPrice.id,
+                        amount: value,
+                    }])
+                    await this.memoryService_.recordTruth("admin", "price_updated", {
+                        productId, variantId: variant.id,
+                        oldAmount, newAmount: value, currency: "TRY",
+                        tenantId: services.tenantId || null,
+                    })
+                    return { success: true, action: "update_price", productId, oldValue: oldAmount, newValue: value, currency: "TRY" }
+                } else {
+                    // 3b. Price set var ama TRY fiyatı yok — yeni ekle
+                    await services.pricingModuleService.createPrices([{
+                        price_set_id: priceSet.id,
+                        amount: value,
+                        currency_code: "try",
+                    }])
+                    await this.memoryService_.recordTruth("admin", "price_created", {
+                        productId, variantId: variant.id, amount: value, currency: "TRY",
+                        tenantId: services.tenantId || null,
+                    })
+                    return { success: true, action: "update_price", productId, newValue: value, currency: "TRY", note: "TRY fiyatı eklendi." }
+                }
             }
 
             return { error: `Desteklenmeyen işlem: ${action}` }

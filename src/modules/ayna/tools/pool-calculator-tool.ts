@@ -1,4 +1,4 @@
-import { SchemaType } from "@google/generative-ai"
+import { SchemaType } from "./schema-types"
 
 /**
  * Havuz kimyasal hesaplama aracı — Gemini native FunctionDeclaration formatı

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { ollamaEmbed } from "../ollama-client";
 import logger from "../logger";
 import { initRedis, getRedisClient } from "../redis/client";
 
@@ -53,20 +53,10 @@ export class SemanticCacheService {
     private readonly similarityThreshold: number = 0.92;
     private readonly indexKey: string = "ayna:semantic:index";
     private readonly keyPrefix: string = "ayna:cache:";
-    private genAI: GoogleGenerativeAI | null = null;
-    private embeddingModel: any = null; // GenerativeModel with embed capability
     private redisConnectedPromise: Promise<void> | null = null;
 
     private constructor() {
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (apiKey) {
-            this.genAI = new GoogleGenerativeAI(apiKey);
-            this.embeddingModel = this.genAI.getGenerativeModel({
-                model: "text-embedding-004",
-            });
-        } else {
-            logger.warn("SemanticCacheService: GEMINI_API_KEY not set, embedding generation disabled");
-        }
+        // Embedding artık Ollama (nomic-embed-text) üzerinden üretilir — Gemini kaldırıldı.
     }
 
     /**
@@ -100,13 +90,9 @@ export class SemanticCacheService {
      * Generate embedding vector for a text query
      */
     private async generateEmbedding(query: string): Promise<number[] | null> {
-        if (!this.embeddingModel) {
-            logger.error("SemanticCache: Embedding model not initialized");
-            return null;
-        }
         try {
-            const result = await this.embeddingModel.embedContent(query);
-            return result.embedding.values;
+            const embedding = await ollamaEmbed(query);
+            return embedding.length ? embedding : null;
         } catch (err: any) {
             logger.error("SemanticCache: Embedding generation failed", {
                 error: err.message,

@@ -65,10 +65,6 @@ PROJECT-AYNA-GENESIS/
 ├── docs/                         # Dokümantasyon
 │   └── GENESIS_PROTOCOL/        # Mimari Protokol
 │
-├── n8n/                          # N8N workflow otomasyonu
-│   ├── workflows/               # AI validation workflows
-│   └── sql-templates/           # SQL grounding templates
-│
 ├── docker/                       # Docker yapılandırması
 ├── docker-compose.yml            # Docker Konfigürasyonu
 ├── medusa-config.ts              # Medusa Ayarları
@@ -115,32 +111,11 @@ Platform, **çoklu mağaza (multi-tenant)** desteği ile her mağazanın veriler
 │              Arka Plan İşleri (Workflows)                  │
 └───────────────────────────────────────────────────────────┘
                               │
-        ┌─────────────────────┼─────────────────────┐
         ▼                     ▼                     ▼
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
 │  PostgreSQL  │    │    Redis     │    │ Meilisearch  │
 │   (pgvector) │    │   (Cache)    │    │  (Search)    │
 └──────────────┘    └──────────────┘    └──────────────┘
-```
-
-### n8n AI Orchestration
-
-LLM çağrıları n8n üzerinden SQL grounding ve validation loop ile işlenir:
-
-```
-Storefront → /api/chat → N8nBridge → n8n Webhook
-                                    │
-                                    ▼
-                            ┌───────────────┐
-                            │ 1. Intent     │
-                            │ 2. SQL Ground │
-                            │ 3. AI Agent   │
-                            │ 4. Validate   │
-                            │ 5. Retry Loop │
-                            └───────────────┘
-                                    │
-                                    ▼
-                            Hallucination-Free Response
 ```
 
 ---
@@ -154,7 +129,7 @@ Storefront → /api/chat → N8nBridge → n8n Webhook
 | Database | PostgreSQL + pgvector | 15 |
 | Cache | Redis | Alpine |
 | Search | Meilisearch | 1.13 |
-| AI | Google Gemini | 1.5-flash |
+| AI | Ollama (açık kaynak) | qwen2.5:14b |
 | Container | Docker | Latest |
 
 ---
@@ -168,7 +143,7 @@ Storefront → /api/chat → N8nBridge → n8n Webhook
 | [02_INSTALLATION_GUIDE](docs/GENESIS_PROTOCOL/02_INSTALLATION_GUIDE.md) | Kurulum rehberi |
 | [03_API_REFERENCE](docs/GENESIS_PROTOCOL/03_API_REFERENCE.md) | API endpoint'leri |
 | [04_MODULE_GUIDE](docs/GENESIS_PROTOCOL/04_MODULE_GUIDE.md) | Modül açıklamaları |
-| [05_AI_INTEGRATION_GUIDE](docs/GENESIS_PROTOCOL/05_AI_INTEGRATION_GUIDE.md) | Gemini entegrasyonu |
+| [05_AI_INTEGRATION_GUIDE](docs/GENESIS_PROTOCOL/05_AI_INTEGRATION_GUIDE.md) | Ollama (açık kaynak) entegrasyonu |
 | [06_AYNA_AI_CORE](docs/GENESIS_PROTOCOL/06_AYNA_AI_CORE.md) | Ayna AI Çekirdek ve Teknik Kılavuz |
 
 | [10_MASTER_ARCHITECT_MANUAL](docs/GENESIS_PROTOCOL/10_MASTER_ARCHITECT_MANUAL.md) | Genel mimari rehber |
@@ -182,19 +157,10 @@ Storefront → /api/chat → N8nBridge → n8n Webhook
 # Veritabanı
 DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-genesis
 
-# AI
-GEMINI_API_KEY=your_api_key
-GEMINI_MODEL_NAME=gemini-1.5-flash
-
-# Yedek AI (Fallback Katmanı)
-OLLAMA_API_URL=http://localhost:11434/api/generate
-OLLAMA_MODEL_NAME=llama3
-
-# n8n AI Orchestration
-N8N_BRIDGE_ENABLED=false
-N8N_WEBHOOK_URL=http://n8n:5678
-N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
-N8N_TIMEOUT_MS=30000
+# AI (Ollama — açık kaynak, tek motor; Gemini kaldırıldı)
+OLLAMA_API_URL=http://host.docker.internal:11434
+OLLAMA_MODEL_NAME=qwen2.5:14b
+OLLAMA_EMBED_MODEL=nomic-embed-text
 
 # Arama
 MEILISEARCH_HOST=http://meilisearch:7700
@@ -224,7 +190,7 @@ Ayna, müşterilere yardımcı olan yapay zeka asistanıdır.
 - 🏭 Otonom Mağaza Kurulumu (`generate_storefront_data` - Bloom Mimarisi)
 - ⚖️ Vicdan filtresi (`conscience_check`)
 - 🧠 Hafıza Özetleme (`memory_summarization` - Asenkron Profil Çıkarımı)
-- 🛡️ Yıkılmazlık Katmanı (`fallback_ai` - Gemini 500/429 Hatalarında Ollama Yedekleme)
+- 🛡️ Yıkılmazlık Katmanı (`fallback_ai` - Ollama timeout/hata durumunda graceful degradation)
 - 🔒 Stabilite & Güvenlik (Kurşun Geçirmez Zod Endpoint Doğrulaması, remoteQuery modül izolasyonu, professional mock providers)
 
 **API Endpoint:**

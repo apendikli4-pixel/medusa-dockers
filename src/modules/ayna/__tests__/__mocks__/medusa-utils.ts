@@ -49,6 +49,28 @@ export class MedusaError extends Error {
 }
 
 /**
+ * Modules enum stub — Medusa modül adlarını tanımlar.
+ */
+export const Modules = {
+  PRODUCT: "productModuleService",
+  PRICING: "pricingModuleService",
+  INVENTORY: "inventoryModuleService",
+  STOCK_LOCATION: "stockLocationModuleService",
+  SALES_CHANNEL: "salesChannelModuleService",
+  CUSTOMER: "customerModuleService",
+  CART: "cartModuleService",
+  ORDER: "orderModuleService",
+  PAYMENT: "paymentModuleService",
+  FULFILLMENT: "fulfillmentModuleService",
+  NOTIFICATION: "notificationModuleService",
+  REGION: "regionModuleService",
+  FILE: "fileModuleService",
+  PROMOTION: "promotionModuleService",
+  CACHE: "cacheModuleService",
+  EVENT_BUS: "eventBusModuleService",
+}
+
+/**
  * BigNumber stub — V2.15 ile lib/money.ts BigNumber kullanmaya başladı.
  * Test ortamında gerçek BigNumber.js'i çekmemek için minimal bir wrapper.
  * Production'da @medusajs/framework/utils gerçek BigNumber'ı sağlar.

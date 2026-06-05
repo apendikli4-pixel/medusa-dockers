@@ -1,22 +1,23 @@
 /**
- * HybridAIProviderService — Gemini birincil + Ollama yedek
+ * HybridAIProviderService — Açık kaynak (Ollama) tek motor.
  *
- * Tarihçe: Önceden `Injectable` decorator kullanıyordu (@medusajs/framework/utils),
- * V2.15'te bu kaldırıldı — plain class olarak yeniden yapılandırıldı.
- * Ollama API response'larına explicit tip annotation eklendi (önceden
- * `unknown` olarak inferred edilip @ts-nocheck ile geçilmişti).
+ * Tarihçe:
+ *  - Önceden Gemini birincil + Ollama yedek hibrit yapıydı.
+ *  - 2026-06: Gemini TAMAMEN kaldırıldı (kota bağımlılığı + kapalı kaynak).
+ *    Artık yalnızca Ollama (varsayılan qwen2.5:14b) kullanılıyor — tam açık kaynak,
+ *    self-hosted, kota yok, veri dışarı çıkmaz.
+ *  - Sınıf adı ve public arayüz (generateText/generateStructured/embed) geriye
+ *    uyumluluk için korundu; çağıran kod (chat-service, blog/generate) değişmedi.
  */
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { Logger } from "@medusajs/framework/types"
 
-// Node 20+ artık global fetch sağlıyor; ek pakete (node-fetch ESM uyumsuzluğu)
-// gerek kalmadı. Local alias eski çağrı sitelerini bozmadan tutuyoruz.
+// Node 20+ global fetch sağlıyor.
 const nodeFetch = globalThis.fetch
 
 // ─── OLLAMA API TİPLERİ ────────────────────────────────────────────
 
 /**
- * Ollama /api/generate response şeması (resmi dokümandan).
+ * Ollama /api/generate response şeması.
  * @see https://github.com/ollama/ollama/blob/main/docs/api.md
  */
 interface OllamaGenerateResponse {
@@ -24,420 +25,205 @@ interface OllamaGenerateResponse {
     created_at: string
     response: string
     done: boolean
-    /** Prompt token sayısı — usage telemetrisi için */
     prompt_eval_count?: number
-    /** Üretilen token sayısı */
     eval_count?: number
-    /** Nanosaniye cinsinden toplam süre */
     total_duration?: number
 }
 
-/**
- * Ollama /api/embeddings response şeması.
- */
 interface OllamaEmbeddingResponse {
     embedding: number[]
 }
 
 /**
- * Interface for AI provider responses
+ * AI provider yanıt arayüzü.
+ * providerUsed her zaman "ollama" (Gemini kaldırıldı; tip geriye uyumlu tutuldu).
  */
 export interface AIProviderResponse {
-  text: string
-  providerUsed: "gemini" | "ollama"
-  metadata?: Record<string, any>
-  functionCalls?: any[]
-  usage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
+    text: string
+    providerUsed: "ollama"
+    metadata?: Record<string, any>
+    functionCalls?: any[]
+    usage?: {
+        promptTokens: number
+        completionTokens: number
+        totalTokens: number
+    }
 }
 
-/**
- * Options for AI generation
- */
 export interface AIGenerateOptions {
-  temperature?: number
-  maxTokens?: number
-  responseFormat?: "text" | "json"
-  tools?: any[]
+    temperature?: number
+    maxTokens?: number
+    responseFormat?: "text" | "json"
+    tools?: any[]
 }
 
-/**
- * Structured generation options
- */
 export interface AIStructuredOptions extends AIGenerateOptions {
-  schema?: Record<string, any> // JSON schema for structured output
+    schema?: Record<string, any>
 }
 
-/**
- * Embedding options
- */
 export interface AIEmbedOptions {
-  /**
-   * Text to embed
-   */
-  input: string | string[]
+    input: string | string[]
 }
 
 export class HybridAIProviderService {
-  protected geminiModel: any
-  protected ollamaBaseUrl: string
-  protected ollamaModel: string
-  protected logger: Logger
+    protected ollamaBaseUrl: string
+    protected ollamaModel: string
+    protected embedModel: string
+    protected logger: Logger
 
-  constructor(logger: Logger) {
-    this.logger = logger
-    
-    // Initialize Gemini if API key is available
-    const geminiApiKey = process.env.GEMINI_API_KEY
-    if (geminiApiKey) {
-      const genAI = new GoogleGenerativeAI(geminiApiKey)
-      const modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash"
-      this.geminiModel = genAI.getGenerativeModel({ model: modelName })
-      this.logger.info(`Hybrid AI Provider: Gemini initialized with model ${modelName}`)
-    } else {
-      this.logger.warn("Hybrid AI Provider: GEMINI_API_KEY not found, Gemini disabled")
+    constructor(logger: Logger) {
+        this.logger = logger
+
+        this.ollamaBaseUrl = process.env.OLLAMA_API_URL || "http://host.docker.internal:11434"
+        this.ollamaModel = process.env.OLLAMA_MODEL_NAME || "qwen2.5:14b"
+        // Embedding için ayrı, hafif bir model kullanmak idealdir (nomic-embed-text).
+        // Yoksa ana modele düşer.
+        this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
+
+        this.logger.info(
+            `AI Provider: Ollama (açık kaynak) — ${this.ollamaBaseUrl}, model: ${this.ollamaModel}, embed: ${this.embedModel}`
+        )
     }
-    
-    // Ollama configuration
-    this.ollamaBaseUrl = process.env.OLLAMA_API_URL || "http://ollama:11434"
-    this.ollamaModel = process.env.OLLAMA_MODEL_NAME || "llama3"
-    this.logger.info(`Hybrid AI Provider: Ollama configured at ${this.ollamaBaseUrl} with model ${this.ollamaModel}`)
-  }
 
-  /**
-   * Check if Gemini is available and configured
-   */
-  private isGeminiAvailable(): boolean {
-    return !!this.geminiModel
-  }
-
-  /**
-   * Generate text using Gemini with Ollama fallback
-   */
-  async generateText(
-    prompt: string,
-    options: AIGenerateOptions = {}
-  ): Promise<AIProviderResponse> {
-    const { temperature = 0.7, maxTokens = 1000, responseFormat = "text", tools } = options
-    
-    // Try Gemini first
-    if (this.isGeminiAvailable()) {
-      try {
-        this.logger.debug("Hybrid AI Provider: Attempting Gemini text generation")
-        
-        const request: any = {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature,
-                maxOutputTokens: maxTokens,
-            }
-        }
-        
-        if (tools && tools.length > 0) {
-            request.tools = [{ functionDeclarations: tools }]
-        }
-
-        const result = await this.geminiModel.generateContent(request)
-
-        const response = await result.response
-        const functionCalls = response.functionCalls()
-        
-        // If function calls are returned, the text might be empty
-        const text = functionCalls?.length ? "" : response.text()
-
-        // Extract token usage
-        const usageMeta = result.usageMetadata()
-        const promptTokens = usageMeta?.promptTokenCount || 0
-        const completionTokens = usageMeta?.candidatesTokenCount || 0
-        const totalTokens = usageMeta?.totalTokenCount || (promptTokens + completionTokens)
-
-        return {
-          text,
-          providerUsed: "gemini",
-          functionCalls,
-          metadata: { temperature, maxTokens, responseFormat },
-          usage: { promptTokens, completionTokens, totalTokens }
-        }
-      } catch (error: any) {
-        // Check if we should fallback (429, 500, or timeout)
-        if (this.shouldFallback(error)) {
-          this.logger.warn(`Hybrid AI Provider: Gemini failed, falling back to Ollama. Error: ${error.message}`)
-        } else {
-          // Re-throw if it's not a fallback-worthy error
-          throw error
-        }
-      }
+    /**
+     * Düz metin üretimi.
+     */
+    async generateText(
+        prompt: string,
+        options: AIGenerateOptions = {}
+    ): Promise<AIProviderResponse> {
+        return this.ollamaGenerateText(prompt, options)
     }
-    
-    // Fallback to Ollama
-    return this.ollamaGenerateText(prompt, options)
-  }
 
-  /**
-   * Generate structured output (JSON) with fallback
-   */
-  async generateStructured(
-    prompt: string,
-    options: AIStructuredOptions = {}
-  ): Promise<AIProviderResponse> {
-    const { temperature = 0.7, maxTokens = 1000, schema } = options
-    
-    // Enhance prompt for JSON output if schema provided
-    let enhancedPrompt = prompt
-    if (schema) {
-      enhancedPrompt = `${prompt}\n\nRespond with valid JSON matching this schema: ${JSON.stringify(schema)}`
-    }
-    
-    // Try Gemini first
-    if (this.isGeminiAvailable()) {
-      try {
-        this.logger.debug("Hybrid AI Provider: Attempting Gemini structured generation")
-        const result = await this.geminiModel.generateContent(enhancedPrompt, {
-          temperature,
-          maxOutputTokens: maxTokens,
-        })
-
-        const response = await result.response
-        let text = response.text()
-
-        // Try to parse as JSON, if it fails return as-is
-        try {
-          JSON.parse(text)
-        } catch (parseError) {
-          // If not valid JSON, wrap in a basic structure
-          text = JSON.stringify({ response: text })
+    /**
+     * Yapılandırılmış (JSON) çıktı üretimi.
+     */
+    async generateStructured(
+        prompt: string,
+        options: AIStructuredOptions = {}
+    ): Promise<AIProviderResponse> {
+        const { schema } = options
+        let enhancedPrompt = prompt
+        if (schema) {
+            enhancedPrompt = `${prompt}\n\nYanıtı şu JSON şemasına uygun, geçerli JSON olarak ver: ${JSON.stringify(schema)}`
         }
-
-        // Extract token usage
-        const usageMeta = result.usageMetadata()
-        const promptTokens = usageMeta?.promptTokenCount || 0
-        const completionTokens = usageMeta?.candidatesTokenCount || 0
-        const totalTokens = usageMeta?.totalTokenCount || (promptTokens + completionTokens)
-
-        return {
-          text,
-          providerUsed: "gemini",
-          metadata: {
-            temperature,
-            maxTokens,
+        return this.ollamaGenerateText(enhancedPrompt, {
+            ...options,
             responseFormat: "json",
-            schemaProvided: !!schema
-          },
-          usage: { promptTokens, completionTokens, totalTokens }
-        }
-      } catch (error: any) {
-        // Check if we should fallback (429, 500, or timeout)
-        if (this.shouldFallback(error)) {
-          this.logger.warn(`Hybrid AI Provider: Gemini structured generation failed, falling back to Ollama. Error: ${error.message}`)
-        } else {
-          // Re-throw if it's not a fallback-worthy error
-          throw error
-        }
-      }
-    }
-    
-    // Fallback to Ollama
-    return this.ollamaGenerateText(enhancedPrompt, { ...options, responseFormat: "json" })
-  }
-
-  /**
-   * Generate embeddings with fallback
-   */
-  async embed(options: AIEmbedOptions): Promise<AIProviderResponse> {
-    const { input } = options
-    
-    // Try Gemini first for embeddings
-    if (this.isGeminiAvailable()) {
-      try {
-        this.logger.debug("Hybrid AI Provider: Attempting Gemini embedding generation")
-        const embedModelName = process.env.GEMINI_EMBEDDING_MODEL || "text-embedding-004"
-        
-        // For Gemini embeddings, we need to use the embedding model specifically
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-        const embedModel = genAI.getGenerativeModel({ model: embedModelName })
-        
-        const result = await embedModel.embedContent(Array.isArray(input) ? input[0] : input)
-        const embedding = result.embedding
-        
-        return {
-          text: JSON.stringify({ embedding: embedding.values }),
-          providerUsed: "gemini",
-          metadata: { inputType: Array.isArray(input) ? "array" : "string", embeddingDimension: embedding.values.length }
-        }
-      } catch (error: any) {
-        // Check if we should fallback (429, 500, or timeout)
-        if (this.shouldFallback(error)) {
-          this.logger.warn(`Hybrid AI Provider: Gemini embedding failed, falling back to Ollama. Error: ${error.message}`)
-        } else {
-          // Re-throw if it's not a fallback-worthy error
-          throw error
-        }
-      }
-    }
-    
-    // Fallback to Ollama for embeddings
-    return this.ollamaEmbed(options)
-  }
-
-  /**
-   * Determine if error warrants fallback
-   */
-  private shouldFallback(error: any): boolean {
-    if (!error) return false
-    
-    // Check for HTTP status codes
-    if (error.status === 429 || error.status >= 500) {
-      return true
-    }
-    
-    // Check for timeout-like errors
-    if (error.message && (
-      error.message.includes("timeout") || 
-      error.message.includes("Timeout") ||
-      error.message.includes("ETIMEDOUT")
-    )) {
-      return true
-    }
-    
-    // Check for rate limiting messages
-    if (error.message && (
-      error.message.includes("rate limit") ||
-      error.message.includes("quota") ||
-      error.message.includes("429")
-    )) {
-      return true
-    }
-    
-    return false
-  }
-
-  /**
-   * Generate text using Ollama
-   */
-  private async ollamaGenerateText(
-    prompt: string,
-    options: AIGenerateOptions = {}
-  ): Promise<AIProviderResponse> {
-    const { temperature = 0.7, maxTokens = 1000, responseFormat = "text" } = options
-    
-    this.logger.debug(`Hybrid AI Provider: Using Ollama for text generation`)
-    
-    const ollamaOptions: any = {
-      model: this.ollamaModel,
-      prompt,
-      stream: false,
-      options: {
-        temperature,
-        num_predict: maxTokens
-      }
-    }
-    
-    // Add format for JSON if requested
-    if (responseFormat === "json") {
-      ollamaOptions.format = "json"
-    }
-    
-    try {
-      // AbortController ile timeout — yavaş CPU inference'ta sonsuz bekleme önlenir.
-      // OLLAMA_TIMEOUT_MS env ile ayarlanabilir (varsayılan 280sn).
-      const timeoutMs = parseInt(process.env.OLLAMA_TIMEOUT_MS || "280000", 10)
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), timeoutMs)
-
-      let response: Response
-      try {
-        response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(ollamaOptions),
-          signal: controller.signal
         })
-      } finally {
-        clearTimeout(timer)
-      }
-
-      if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
-      }
-      
-      const result = (await response.json()) as OllamaGenerateResponse
-
-      const promptTokens = result.prompt_eval_count || 0
-      const completionTokens = result.eval_count || 0
-      const totalTokens = promptTokens + completionTokens
-
-      return {
-        text: result.response,
-        providerUsed: "ollama",
-        metadata: {
-          temperature,
-          maxTokens,
-          responseFormat,
-          ollamaEvalCount: completionTokens,
-          ollamaPromptEvalCount: promptTokens
-        },
-        usage: { promptTokens, completionTokens, totalTokens }
-      }
-    } catch (error: any) {
-      this.logger.error(`Hybrid AI Provider: Ollama generation failed: ${error.message}`)
-      throw new Error(`Both Gemini and Ollama failed. Last error (Ollama): ${error.message}`)
     }
-  }
 
-  /**
-   * Generate embeddings using Ollama
-   */
-  private async ollamaEmbed(options: AIEmbedOptions): Promise<AIProviderResponse> {
-    const { input } = options
-    
-    this.logger.debug(`Hybrid AI Provider: Using Ollama for embeddings`)
-    
-    try {
-      const texts = Array.isArray(input) ? input : [input]
-      const embeddings = []
-      
-      // Process each text individually (Ollama API processes one at a time)
-      for (const text of texts) {
-        const response = await nodeFetch(`${this.ollamaBaseUrl}/api/embeddings`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
+    /**
+     * Embedding üretimi.
+     */
+    async embed(options: AIEmbedOptions): Promise<AIProviderResponse> {
+        return this.ollamaEmbed(options)
+    }
+
+    /**
+     * Ollama ile metin üretimi (AbortController timeout'lu).
+     */
+    private async ollamaGenerateText(
+        prompt: string,
+        options: AIGenerateOptions = {}
+    ): Promise<AIProviderResponse> {
+        const { temperature = 0.7, maxTokens = 1000, responseFormat = "text" } = options
+
+        const ollamaOptions: any = {
             model: this.ollamaModel,
-            prompt: text
-          })
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Ollama embeddings API error: ${response.status} ${response.statusText}`)
+            prompt,
+            stream: false,
+            options: {
+                temperature,
+                num_predict: maxTokens,
+            },
         }
-        
-        const result = (await response.json()) as OllamaEmbeddingResponse
-        embeddings.push(result.embedding)
-      }
-      
-      return {
-        text: JSON.stringify({ 
-          embeddings: embeddings,
-          count: embeddings.length
-        }),
-        providerUsed: "ollama",
-        metadata: { 
-          inputCount: texts.length,
-          embeddingDimension: embeddings[0]?.length || 0
+        if (responseFormat === "json") {
+            ollamaOptions.format = "json"
         }
-      }
-    } catch (error: any) {
-      this.logger.error(`Hybrid AI Provider: Ollama embedding failed: ${error.message}`)
-      throw new Error(`Both Gemini and Ollama embedding failed. Last error (Ollama): ${error.message}`)
+
+        const timeoutMs = parseInt(process.env.OLLAMA_TIMEOUT_MS || "290000", 10)
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+        try {
+            let response: Response
+            try {
+                response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(ollamaOptions),
+                    signal: controller.signal,
+                })
+            } finally {
+                clearTimeout(timer)
+            }
+
+            if (!response.ok) {
+                throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
+            }
+
+            const result = (await response.json()) as OllamaGenerateResponse
+            const promptTokens = result.prompt_eval_count || 0
+            const completionTokens = result.eval_count || 0
+
+            return {
+                text: result.response,
+                providerUsed: "ollama",
+                metadata: {
+                    temperature,
+                    maxTokens,
+                    responseFormat,
+                    ollamaEvalCount: completionTokens,
+                    ollamaPromptEvalCount: promptTokens,
+                },
+                usage: {
+                    promptTokens,
+                    completionTokens,
+                    totalTokens: promptTokens + completionTokens,
+                },
+            }
+        } catch (error: any) {
+            this.logger.error(`AI Provider: Ollama üretim hatası: ${error.message}`)
+            throw new Error(`Ollama yanıt veremedi: ${error.message}`)
+        }
     }
-  }
+
+    /**
+     * Ollama ile embedding üretimi.
+     */
+    private async ollamaEmbed(options: AIEmbedOptions): Promise<AIProviderResponse> {
+        const { input } = options
+        try {
+            const texts = Array.isArray(input) ? input : [input]
+            const embeddings: number[][] = []
+
+            for (const text of texts) {
+                const response = await nodeFetch(`${this.ollamaBaseUrl}/api/embeddings`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: this.embedModel, prompt: text }),
+                })
+                if (!response.ok) {
+                    throw new Error(`Ollama embeddings API error: ${response.status} ${response.statusText}`)
+                }
+                const result = (await response.json()) as OllamaEmbeddingResponse
+                embeddings.push(result.embedding)
+            }
+
+            return {
+                text: JSON.stringify({ embeddings, count: embeddings.length }),
+                providerUsed: "ollama",
+                metadata: {
+                    inputCount: texts.length,
+                    embeddingDimension: embeddings[0]?.length || 0,
+                },
+            }
+        } catch (error: any) {
+            this.logger.error(`AI Provider: Ollama embedding hatası: ${error.message}`)
+            throw new Error(`Ollama embedding üretemedi: ${error.message}`)
+        }
+    }
 }
 
 export default HybridAIProviderService

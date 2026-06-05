@@ -1,4 +1,4 @@
-import { SchemaType } from "@google/generative-ai"
+import { SchemaType } from "./schema-types"
 
 export const categoryTool = {
     name: "create_category",

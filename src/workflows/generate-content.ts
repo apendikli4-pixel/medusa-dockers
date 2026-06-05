@@ -7,9 +7,7 @@ import {
 import { Modules } from "@medusajs/framework/utils"
 import { CONTENT_ENGINE_MODULE } from "../modules/content_engine"
 import { TENANT_MODULE } from "../modules/tenant"
-import { GoogleGenerativeAI } from "@google/generative-ai"
-
-import { AI_CONFIG } from "../lib/ai-config"
+import { ollamaGenerate } from "../lib/ollama-client"
 
 // =============================================================================
 // ADIM 1: Ürün Verisini Çek
@@ -49,16 +47,6 @@ const getTenantContextStep = createStep(
 const generateAIContentStep = createStep(
     "generate-ai-content",
     async (input: { product: any; tenantContext: any }, { container }) => {
-        const apiKey = process.env.GEMINI_API_KEY
-
-        if (!apiKey) {
-            throw new Error("MİMARİ HATA: GEMINI_API_KEY .env dosyasında bulunamadı!")
-        }
-
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const modelName = AI_CONFIG.geminiModel
-        const model = genAI.getGenerativeModel({ model: modelName })
-
         const product = input.product
         const tenantCtx = input.tenantContext
 
@@ -96,9 +84,7 @@ const generateAIContentStep = createStep(
         `
 
         try {
-            const result = await model.generateContent(prompt)
-            const response = await result.response
-            const text = response.text()
+            const text = await ollamaGenerate(prompt, { temperature: 0.5, maxTokens: 1500, json: true })
 
             // JSON temizliği (Bazen AI markdown ```json ... ``` ekler, onu temizleyelim)
             const cleanJson = text.replace(/```json|```/g, "").trim()

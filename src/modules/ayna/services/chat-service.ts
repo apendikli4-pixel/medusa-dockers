@@ -5,7 +5,6 @@ import AynaMemoryService from "./memory-service"
 import AynaToolService from "./tool-service"
 import { HybridAIProviderService } from "./hybrid-ai.provider"
 import { SemanticCacheService, CacheType } from "../../../lib/cache/semantic-cache.service"
-import { N8nBridgeService } from "../../../lib/n8n-bridge"
 // Import injection detector service
 import InjectionDetectorService from "../../../modules/conscience/services/injection-detector.service"
 
@@ -89,7 +88,6 @@ export default class AynaChatService {
     protected hybridAIProvider_: HybridAIProviderService
     protected injectionDetectorService_: InjectionDetectorService
     protected semanticCache_: SemanticCacheService
-    protected n8nBridge_: N8nBridgeService
 
     constructor({ logger, aynaMemoryService, aynaToolService, hybridAIProvider, injectionDetectorService }: InjectedDependencies) {
         this.logger_ = logger
@@ -98,7 +96,6 @@ export default class AynaChatService {
         this.hybridAIProvider_ = hybridAIProvider
         this.injectionDetectorService_ = injectionDetectorService
         this.semanticCache_ = SemanticCacheService.getInstance()
-        this.n8nBridge_ = new N8nBridgeService(logger)
     }
 
     async processMessage(
@@ -125,7 +122,7 @@ export default class AynaChatService {
             
             // Return a safe response instead of processing the malicious input
             return {
-                response: "I'm unable to process that request as it appears to contain inappropriate content. Please rephrase your question.",
+                response: "Girdiğiniz mesaj güvenlik kurallarımıza uymuyor. Lütfen ifadenizi değiştirerek tekrar deneyin.",
                 debug: {
                     blocked: true,
                     riskScore: injectionResult.riskScore,
@@ -154,62 +151,6 @@ export default class AynaChatService {
                 this.logger_.warn(`[AynaChat] Failed to fetch tenant context for ${options.tenantId}`);
             }
         }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // n8n BRIDGE — Grounded + Validated AI
-        // Eğer n8n köprüsü aktifse tüm mesajlar n8n'e yönlendirilir.
-        // n8n tarafında: SQL grounding → AI Agent → Validation Loop
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        if (this.n8nBridge_.isEnabled()) {
-            try {
-                this.logger_.info("[AynaChat] Routing to n8n bridge (grounded mode)")
-
-                const n8nResponse = await this.n8nBridge_.chat({
-                    message,
-                    customer_id: options.customerId || null,
-                    customer_group: options.customerGroup || "B2C_Retail",
-                    is_admin: isAdmin,
-                    image: options.image || null,
-                    tenant_id: options.tenantId || null,
-                    tenant_context: tenantContext || null,
-                })
-
-                // Record truth even when using n8n
-                await this.memoryService_.recordTruth(
-                    options.customerId || "anonymous",
-                    "chat_n8n",
-                    {
-                        message: message.substring(0, 50),
-                        grounded: n8nResponse.grounded,
-                        validated: n8nResponse.validated,
-                        intent: n8nResponse.intent,
-                        retryCount: n8nResponse.retry_count || 0,
-                    }
-                )
-
-                return {
-                    response: n8nResponse.response,
-                    debug: {
-                        model: "n8n-grounded-gemini",
-                        provider: "n8n",
-                        grounded: n8nResponse.grounded,
-                        validated: n8nResponse.validated,
-                        intent: n8nResponse.intent,
-                        productCount: n8nResponse.product_count,
-                        retryCount: n8nResponse.retry_count,
-                        isAdmin,
-                    },
-                }
-            } catch (n8nError: unknown) {
-                const errMsg = n8nError instanceof Error ? n8nError.message : String(n8nError)
-                this.logger_.warn(`[AynaChat] n8n bridge failed, falling back to direct LLM: ${errMsg}`)
-                // Fall through to direct LLM below
-            }
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // DIRECT LLM FALLBACK — Eski akış (n8n kapalıysa veya erişilemezse)
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         // Determine cache type (skip if image query; different modalities not cacheable together)
         let cacheType: CacheType = CacheType.GENERAL;
@@ -342,7 +283,7 @@ export default class AynaChatService {
         return {
             response: finalResponse,
             debug: {
-                model: aiResponse.providerUsed === "gemini" ? AI_CONFIG.geminiModel : AI_CONFIG.ollamaModel,
+                model: AI_CONFIG.ollamaModel,
                 toolUsed,
                 isAdmin,
                 providerUsed: aiResponse.providerUsed

@@ -14,7 +14,6 @@ services:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-n8n-db.sql:/docker-entrypoint-initdb.d/init-n8n-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medusa_db_user}"]
       interval: 10s
@@ -187,11 +186,6 @@ services:
       - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
       - REDIS_SENTINEL_MASTER_NAME=medusa-master
       - REDIS_PASSWORD=R3d1sSecurePass2026
-      # n8n Bridge
-      - N8N_BRIDGE_ENABLED=${N8N_BRIDGE_ENABLED:-false}
-      - N8N_WEBHOOK_URL=http://n8n:5678
-      - N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
-      - N8N_TIMEOUT_MS=30000
     env_file:
       - .env
     volumes:
@@ -227,11 +221,6 @@ services:
       - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
       - REDIS_SENTINEL_MASTER_NAME=medusa-master
       - REDIS_PASSWORD=R3d1sSecurePass2026
-      # n8n Bridge
-      - N8N_BRIDGE_ENABLED=${N8N_BRIDGE_ENABLED:-false}
-      - N8N_WEBHOOK_URL=http://n8n:5678
-      - N8N_CHAT_WEBHOOK_PATH=/webhook/ayna-grounded-chat
-      - N8N_TIMEOUT_MS=30000
     env_file:
       - .env
     volumes:
@@ -262,7 +251,6 @@ services:
       - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://localhost:9000
       - NEXT_PUBLIC_SEARCH_ENDPOINT=http://localhost:9000
       - NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${PUBLISHABLE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - MEILISEARCH_HOST=http://meilisearch:7700
       - MEILISEARCH_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
     volumes:
@@ -274,43 +262,11 @@ services:
     depends_on:
       - medusa-server
 
-  # ═══════════════════════════════════════════════════════════════
-  # n8n — Workflow Automation
-  # ═══════════════════════════════════════════════════════════════
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: medusa_n8n
-    restart: unless-stopped
-    expose:
-      - "5678"
-    environment:
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
-      - GENERIC_TIMEZONE=${TZ:-Europe/Istanbul}
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-    volumes:
-      - n8n_data:/home/node/.n8n
-    networks:
-      - medusa_network
-    depends_on:
-      - postgres
-
 volumes:
   postgres_data:
   redis_master_data:
   redis_replica_data:
   meilisearch_data:
-  n8n_data:
 
 networks:
   medusa_network:

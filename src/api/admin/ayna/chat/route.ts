@@ -27,7 +27,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         logger.info(`[Ayna Admin] Message received. Processing...`)
 
         // Defensively resolve services
-        let productModuleService, inventoryService, stockLocationService, pricingModuleService, salesChannelModuleService, contentEngineService, remoteQuery
+        let productModuleService, inventoryService, stockLocationService, pricingModuleService, salesChannelModuleService, contentEngineService, remoteQuery, remoteLink
         try { productModuleService = req.scope.resolve(Modules.PRODUCT) } catch (e) { }
         try { inventoryService = req.scope.resolve(Modules.INVENTORY) } catch (e) { }
         try { stockLocationService = req.scope.resolve(Modules.STOCK_LOCATION) } catch (e) { }
@@ -35,6 +35,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         try { salesChannelModuleService = req.scope.resolve(Modules.SALES_CHANNEL) } catch (e) { }
         try { contentEngineService = req.scope.resolve(MODULES.CONTENT_ENGINE) } catch (e) { }
         try { remoteQuery = req.scope.resolve("remoteQuery") } catch (e) { }
+        try { remoteLink = req.scope.resolve("remoteLink") } catch (e) { }
 
         const result = await aynaService.processMessage(message, {
             isAdmin: true,
@@ -47,6 +48,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             salesChannelModuleService,
             contentEngineService,
             remoteQuery,
+            remoteLink,
         })
 
         return res.status(200).json(result)

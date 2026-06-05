@@ -1,26 +1,18 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { applyRateLimit, CONTENT_LIMITER } from "../../../lib/rate-limiter"
 import { z } from "@medusajs/framework/zod"
+import { ollamaGenerate, ollamaConfigured } from "../../../lib/ollama-client"
 
 const GenerateContentSchema = z.object({
     prompt: z.string().min(1).max(4000),
 })
 
 export async function generateAiContent(prompt: string) {
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-        throw new Error("No API Key configured on server")
+    if (!ollamaConfigured()) {
+        throw new Error("No AI engine configured on server (Ollama)")
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const modelName = process.env.GEMINI_MODEL_NAME || "gemini-3-flash-preview"
-    const model = genAI.getGenerativeModel({ model: modelName })
-
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
-
+    const text = await ollamaGenerate(prompt, { temperature: 0.5, maxTokens: 1500 })
     return text.replace(/```json|```/g, "").trim()
 }
 

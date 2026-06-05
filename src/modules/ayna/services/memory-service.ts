@@ -1,8 +1,7 @@
 import { MedusaService } from "@medusajs/framework/utils"
 import { Logger, Context } from "@medusajs/framework/types"
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { ollamaGenerate } from "../../../lib/ollama-client"
 import { MemoryTruth, MemoryInsight, MemoryConscience } from "../models/memory"
-import { AI_CONFIG } from "../../../lib/ai-config"
 
 type InjectedDependencies = {
     logger: Logger
@@ -15,15 +14,10 @@ export default class AynaMemoryService extends MedusaService({
     MemoryConscience,
 }) {
     protected logger_: Logger
-    protected genAI_: GoogleGenerativeAI | null = null
 
     constructor(container: InjectedDependencies) {
         super(container)
         this.logger_ = container.logger
-        const apiKey = process.env.GEMINI_API_KEY
-        if (apiKey) {
-            this.genAI_ = new GoogleGenerativeAI(apiKey)
-        }
     }
 
     /**
@@ -90,14 +84,8 @@ export default class AynaMemoryService extends MedusaService({
 
             if (!insights || insights.length < 10) return
 
-            const model = this.genAI_?.getGenerativeModel({
-                model: AI_CONFIG.geminiModel
-            })
-            if (!model) return
-
             const prompt = `Aşağıdaki müşteri bilgilerini ve etkileşimleri analiz ederek kısa bir özet çıkar:\n${insights.map((i: any) => i.content).join("\n")}`
-            const result = await model.generateContent(prompt)
-            const summary = result.response.text().trim()
+            const summary = (await ollamaGenerate(prompt, { temperature: 0.3, maxTokens: 500 })).trim()
 
             // Yeni özet insight olarak ekle
             // @ts-ignore

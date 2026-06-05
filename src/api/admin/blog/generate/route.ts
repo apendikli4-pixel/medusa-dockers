@@ -75,23 +75,34 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         try {
             const ayna = req.scope.resolve("ayna") as any
             const prompt =
-                `Görev: Aşağıdaki başlık için kısa ve profesyonel bir Türkçe blog yazısı yaz.\n\n` +
-                `KURALLAR:\n` +
-                `- SADECE Türkçe yaz. İngilizce kelime KULLANMA.\n` +
-                `- Markdown kullan: 2 adet "## Alt Başlık" ve her birinin altında 1 paragraf.\n` +
-                `- Toplam 120-180 kelime. Akıcı, bilgilendirici, doğal dil.\n` +
+                `Sen profesyonel bir Türk içerik yazarısın. Ana dilin Türkçe.\n` +
+                `Aşağıdaki başlık için bir blog yazısı yaz.\n\n` +
+                `ZORUNLU KURALLAR:\n` +
+                `- Yanıtın TAMAMEN Türkçe olacak. Çince, İngilizce veya başka dilde ` +
+                `TEK BİR kelime/karakter bile KULLANMA.\n` +
+                `- Markdown kullan: 2 adet "## Alt Başlık", her birinin altında 1 paragraf.\n` +
+                `- Toplam 120-180 kelime. Akıcı, bilgilendirici, doğal Türkçe.\n` +
                 `- Aynı cümleyi TEKRARLAMA. Her bölüm farklı bilgi versin.\n` +
                 (keywords.length
                     ? `- Şu anahtar kelimeleri doğal biçimde geçir: ${keywords.join(", ")}.\n`
                     : "") +
-                `\nBAŞLIK: ${title}\n\nYAZI:`
+                `\nBAŞLIK: ${title}\n\nTÜRKÇE YAZI:`
 
             // Blog'a özel: düşük temperature (tutarlı), guardian/tool yükü yok.
             // maxTokens düşük tutuldu — yavaş CPU inference'ta timeout riskini azaltır.
-            const aiText = await ayna.generateBlogContent(prompt, {
+            let aiText = await ayna.generateBlogContent(prompt, {
                 temperature: 0.4,
                 maxTokens: 600,
             })
+
+            // Güvenlik ağı: qwen gibi modeller bazen CJK (Çince/Japonca/Korece)
+            // metin sızdırır. CJK içeren satırları ele (prompt %100 garanti vermez).
+            aiText = aiText
+                .split("\n")
+                .filter((line: string) => !/[　-鿿가-힯]/.test(line))
+                .join("\n")
+                .replace(/\n{3,}/g, "\n\n")
+                .trim()
 
             if (!aiText || aiText.length < 50) {
                 throw new Error("AI boş veya çok kısa içerik döndürdü")
@@ -122,7 +133,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
                         id: postId,
                         content:
                             `_AI içerik üretilemedi: ${err.message}_\n\n` +
-                            `Lütfen Ollama/Gemini erişimini kontrol edip tekrar deneyin, ` +
+                            `Lütfen Ollama erişimini kontrol edip tekrar deneyin, ` +
                             `veya içeriği elle yazın.`,
                         status: "draft",
                     } as any,

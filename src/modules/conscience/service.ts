@@ -5,7 +5,7 @@ import {
 } from "@medusajs/framework/types"
 import { BigNumber } from "@medusajs/framework/utils"
 
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { ollamaGenerate } from "../../lib/ollama-client"
 
 type InjectedDependencies = {
     logger: Logger
@@ -23,7 +23,7 @@ export default class ConscienceService extends MedusaService({
 }) implements ConscienceServiceMethods {
     static identifier = "conscience"
     protected logger_: Logger
-    protected genAI_: GoogleGenerativeAI | null = null
+    protected aiEnabled_: boolean = true
     protected injectionDetectionEnabled: boolean = true
     protected injectionRiskThreshold: number = 70
     protected injectionBlockList: string[] = []
@@ -46,10 +46,8 @@ export default class ConscienceService extends MedusaService({
             this.injectionAllowList = options.injectionDetection.allowList || [];
         }
 
-        const apiKey = process.env.GEMINI_API_KEY
-        if (apiKey) {
-            this.genAI_ = new GoogleGenerativeAI(apiKey)
-        }
+        // AI (Ollama) self-hosted — her zaman etkin kabul edilir.
+        this.aiEnabled_ = true
     }
 
     /**
@@ -159,21 +157,20 @@ export default class ConscienceService extends MedusaService({
             }
         }
 
-        // 2. AI Tabanlı Etik Değerlendirme (Derin Analiz)
-        if (this.genAI_) {
+        // 2. AI Tabanlı Etik Değerlendirme (Derin Analiz) — Ollama
+        if (this.aiEnabled_) {
             try {
-                const model = this.genAI_.getGenerativeModel({ model: process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash" })
                 const prompt = `
                     Bir e-ticaret asistanının yapmak istediği şu eylemi etik ve dürüstlük açısından değerlendir:
                     Eylem: "${proposed_action}"
                     Bağlam: ${JSON.stringify(context)}
-                    
+
                     Yanıtını SADECE şu JSON formatında ver:
                     { "verdict": "ALLOW" | "DENY", "reasoning": "kısa gerekçe" }
                 `
-                const result = await model.generateContent(prompt)
-                const response = JSON.parse(result.response.text().trim().replace(/```json|```/g, ""))
-                
+                const raw = await ollamaGenerate(prompt, { temperature: 0.2, json: true })
+                const response = JSON.parse(raw.trim().replace(/```json|```/g, ""))
+
                 await this.logVerdict(response.verdict, proposed_action, response.reasoning, context)
                 return response
             } catch (e: unknown) {
