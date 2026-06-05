@@ -75,7 +75,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-medusa_db_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-genesis}
       REDIS_URL: redis://:${REDIS_PASSWORD:-R3d1sSecurePass2026}@redis:6379
       MEDUSA_WORKER_MODE: server
-      DISABLE_MEDUSA_ADMIN: "false"
+      DISABLE_MEDUSA_ADMIN: "true"
       JWT_SECRET: ${JWT_SECRET}
       COOKIE_SECRET: ${COOKIE_SECRET}
       STORE_CORS: ${STORE_CORS}

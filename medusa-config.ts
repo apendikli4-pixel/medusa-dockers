@@ -59,7 +59,10 @@ export default defineConfig({
         },
     },
     admin: {
-        disable: false,
+        // Production imajında admin SPA build'i bulunmayabiliyor (admin-bundler
+        // dist/index.html eksik → crash loop). DISABLE_MEDUSA_ADMIN=true ile
+        // admin kapatılır, backend yalnızca API sunar (storefront + /store + /admin API).
+        disable: process.env.DISABLE_MEDUSA_ADMIN === "true",
         backendUrl: process.env.MEDUSA_ADMIN_BACKEND_URL || "/",
     },
     modules: {

@@ -61,7 +61,15 @@ if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ];
         echo "Production environment detected. Skipping redundant build..."
     fi
     echo "Starting Medusa..."
-    ./node_modules/.bin/medusa start &
+    # Admin SPA build'i production imajında bulunmayabiliyor (admin-bundler dist/index.html
+    # eksik → 'Could not find index.html' ile crash loop). DISABLE_MEDUSA_ADMIN=true ise
+    # admin'i hiç serve etme; backend yalnızca /store + /admin API'lerini sunar.
+    if [ "${DISABLE_MEDUSA_ADMIN}" = "true" ]; then
+        echo "Admin SPA disabled (DISABLE_MEDUSA_ADMIN=true) — API-only mode."
+        MEDUSA_ADMIN_DISABLED=true ./node_modules/.bin/medusa start &
+    else
+        ./node_modules/.bin/medusa start &
+    fi
     PID=$!
     echo "Medusa started with PID $PID. Waiting..."
     wait $PID
