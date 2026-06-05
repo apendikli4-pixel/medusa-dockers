@@ -71,6 +71,18 @@ export default async function Header({ countryCode }: { countryCode: string }) {
                         ></span>
                     </Link>
 
+                    <Link
+                        href={`/${countryCode}/blog`}
+                        className="relative group transition-opacity hover:opacity-100 py-2"
+                        style={{ color: "var(--ag-text)" }}
+                    >
+                        <span>Blog</span>
+                        <span
+                            className="absolute left-0 bottom-0 w-0 h-0.5 transition-all duration-300 group-hover:w-full"
+                            style={{ background: "var(--ag-primary)" }}
+                        ></span>
+                    </Link>
+
                     {customer ? (
                         <Link
                             href={`/${countryCode}/account`}

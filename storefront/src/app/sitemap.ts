@@ -1,22 +1,29 @@
 import { MetadataRoute } from 'next'
-// Note: In a real environment, you would fetch all active product handles and categories from Medusa.
+import { listBlogPosts } from '@/lib/server/blog'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'yearly',
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/tr`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    // Dynamically fetched products would go here
+  const entries: MetadataRoute.Sitemap = [
+    { url: baseUrl, lastModified: new Date(), changeFrequency: 'yearly', priority: 1 },
+    { url: `${baseUrl}/tr`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${baseUrl}/tr/blog`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
   ]
+
+  // Blog yazılarını dinamik ekle (SEO indexleme)
+  try {
+    const { posts } = await listBlogPosts({ limit: 200 })
+    for (const post of posts) {
+      entries.push({
+        url: `${baseUrl}/tr/blog/${post.slug}`,
+        lastModified: post.published_at ? new Date(post.published_at) : new Date(),
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      })
+    }
+  } catch {
+    // backend erişilemezse sadece statik girdiler döner
+  }
+
+  return entries
 }
