@@ -240,9 +240,12 @@ export default class AynaChatService {
                     isAdmin,
                     tenantId: options.tenantId,
                     remoteQuery: options.remoteQuery,
+                    remoteLink: options.remoteLink,
                     productModuleService: options.productModuleService,
                     inventoryService: options.inventoryService,
+                    stockLocationService: options.stockLocationService,
                     pricingModuleService: options.pricingModuleService,
+                    salesChannelModuleService: options.salesChannelModuleService,
                     contentEngineService: options.contentEngineService,
                 })
                 
@@ -252,9 +255,12 @@ export default class AynaChatService {
                 })
             }
             
-            const followUpPrompt = `${fullPrompt}\n\n[SYSTEM (INTERNAL): You called one or more tools. Here are the JSON results of those tool calls: ${JSON.stringify(toolResponses)}.\nNow, provide your final natural language response to the user based on these results.]`
-            
-            aiResponse = await this.hybridAIProvider_.generateText(followUpPrompt, genOptions)
+            const followUpPrompt = `${fullPrompt}\n\n[SYSTEM (INTERNAL): You called one or more tools. Here are the JSON results of those tool calls: ${JSON.stringify(toolResponses)}.\nNow, provide your final natural language response to the user based on these results. Yanıtı Türkçe ver. Yalnızca araç sonuçlarındaki gerçek verilere dayan; veri yoksa dürüstçe bilgi olmadığını söyle.]`
+
+            // Follow-up çağrısında araçları kapat — model sonucu yorumlayıp
+            // düz metin cevap üretsin, tekrar tool çağırmasın.
+            const followUpOptions = { ...genOptions, tools: undefined }
+            aiResponse = await this.hybridAIProvider_.generateText(followUpPrompt, followUpOptions)
             finalResponse = aiResponse.text || ""
         }
 

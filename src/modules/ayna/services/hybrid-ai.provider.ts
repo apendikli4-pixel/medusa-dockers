@@ -35,6 +35,29 @@ interface OllamaEmbeddingResponse {
 }
 
 /**
+ * Ollama /api/chat response şeması (tool/function-calling için).
+ * qwen2.5 gibi modeller message.tool_calls döndürür.
+ * @see https://github.com/ollama/ollama/blob/main/docs/api.md#chat-request-with-tools
+ */
+interface OllamaChatResponse {
+    model: string
+    created_at: string
+    message: {
+        role: string
+        content: string
+        tool_calls?: Array<{
+            function: {
+                name: string
+                arguments: Record<string, any>
+            }
+        }>
+    }
+    done: boolean
+    prompt_eval_count?: number
+    eval_count?: number
+}
+
+/**
  * AI provider yanıt arayüzü.
  * providerUsed her zaman "ollama" (Gemini kaldırıldı; tip geriye uyumlu tutuldu).
  */
@@ -87,11 +110,16 @@ export class HybridAIProviderService {
 
     /**
      * Düz metin üretimi.
+     * Araç (tools) verilirse Ollama /api/chat ile native function-calling kullanılır
+     * (qwen2.5 tool çağrısını destekler). Aksi halde /api/generate'e düşer.
      */
     async generateText(
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
+        if (options.tools && options.tools.length > 0) {
+            return this.ollamaChatWithTools(prompt, options)
+        }
         return this.ollamaGenerateText(prompt, options)
     }
 
@@ -118,6 +146,100 @@ export class HybridAIProviderService {
      */
     async embed(options: AIEmbedOptions): Promise<AIProviderResponse> {
         return this.ollamaEmbed(options)
+    }
+
+    /**
+     * Gemini-stili araç tanımlarını ({ name, description, parameters }) Ollama
+     * /api/chat'in beklediği OpenAI-uyumlu formata çevirir.
+     */
+    private toOllamaTools(tools: any[]): any[] {
+        return (tools || [])
+            .filter((t) => t && t.name)
+            .map((t) => ({
+                type: "function",
+                function: {
+                    name: t.name,
+                    description: t.description || "",
+                    parameters: t.parameters || { type: "object", properties: {} },
+                },
+            }))
+    }
+
+    /**
+     * Ollama /api/chat ile native function-calling.
+     * qwen2.5 modeli message.tool_calls döndürür; bunları chat-service'in
+     * beklediği functionCalls: [{ name, args }] formatına çeviririz.
+     */
+    private async ollamaChatWithTools(
+        prompt: string,
+        options: AIGenerateOptions = {}
+    ): Promise<AIProviderResponse> {
+        const { temperature = 0.7, maxTokens = 1000, tools = [] } = options
+
+        const body: any = {
+            model: this.ollamaModel,
+            messages: [{ role: "user", content: prompt }],
+            stream: false,
+            tools: this.toOllamaTools(tools),
+            options: {
+                temperature,
+                num_predict: maxTokens,
+            },
+        }
+
+        const timeoutMs = parseInt(process.env.OLLAMA_TIMEOUT_MS || "290000", 10)
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+        try {
+            let response: Response
+            try {
+                response = await nodeFetch(`${this.ollamaBaseUrl}/api/chat`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                    signal: controller.signal,
+                })
+            } finally {
+                clearTimeout(timer)
+            }
+
+            if (!response.ok) {
+                throw new Error(`Ollama chat API error: ${response.status} ${response.statusText}`)
+            }
+
+            const result = (await response.json()) as OllamaChatResponse
+            const promptTokens = result.prompt_eval_count || 0
+            const completionTokens = result.eval_count || 0
+
+            const rawCalls = result.message?.tool_calls || []
+            const functionCalls = rawCalls.map((tc) => ({
+                name: tc.function?.name,
+                args: tc.function?.arguments || {},
+            })).filter((c) => !!c.name)
+
+            return {
+                text: result.message?.content || "",
+                providerUsed: "ollama",
+                functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+                metadata: {
+                    temperature,
+                    maxTokens,
+                    toolCount: tools.length,
+                    toolCallsReturned: functionCalls.length,
+                },
+                usage: {
+                    promptTokens,
+                    completionTokens,
+                    totalTokens: promptTokens + completionTokens,
+                },
+            }
+        } catch (error: any) {
+            this.logger.error(`AI Provider: Ollama chat (tools) hatası: ${error.message}`)
+            // Tool çağrısı başarısız olursa düz metin üretimine düş (graceful degradation)
+            this.logger.warn("AI Provider: tool çağrısı başarısız, düz metin üretimine düşülüyor")
+            return this.ollamaGenerateText(prompt, { ...options, tools: undefined })
+        }
     }
 
     /**

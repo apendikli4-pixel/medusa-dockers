@@ -36,6 +36,7 @@ export default class AynaToolService {
             salesChannelModuleService?: any
             contentEngineService?: any
             remoteQuery?: RemoteQueryFunction
+            remoteLink?: any
             isAdmin?: boolean
             tenantId?: string
         }
