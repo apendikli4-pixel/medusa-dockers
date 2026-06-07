@@ -35,8 +35,8 @@ export function useAynaChat() {
 
     const toggleChat = useCallback(() => setIsOpen(prev => !prev), [])
 
-    const sendMessage = useCallback(async (content: string) => {
-        if (!content.trim()) return
+    const sendMessage = useCallback(async (content: string, imageBase64?: string) => {
+        if (!content.trim() && !imageBase64) return
 
         const userMessage: Message = {
             id: Date.now().toString(),
@@ -50,10 +50,17 @@ export function useAynaChat() {
         setError(null)
 
         try {
+            const bodyPayload: any = { message: content }
+            if (imageBase64) {
+                // Sadece data payload'ını gönder (örneğin "data:image/jpeg;base64,..." ise ayıklayıp gönderebiliriz, ancak backend direkt base64 alıyor)
+                const base64Data = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+                bodyPayload.image = base64Data;
+            }
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: content }),
+                body: JSON.stringify(bodyPayload),
             })
 
             if (!response.ok) {

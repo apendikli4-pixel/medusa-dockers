@@ -15,6 +15,13 @@ type HealthStats = {
     error_count: number
     success_rate: number
     last_event: string | null
+    recent_events?: {
+        id: string
+        created_at: string
+        actor: string
+        action: string
+        content: string
+    }[]
 }
 
 const SystemHealthPage = () => {
@@ -99,11 +106,44 @@ const SystemHealthPage = () => {
                 </div>
             )}
 
-            {/* Last Event Info */}
-            {stats?.last_event && (
-                <div className="mt-8 bg-ui-bg-subtle border border-ui-border-base rounded-lg p-6">
-                    <Text className="text-sm text-ui-fg-muted mb-2">Son Aktivite</Text>
-                    <Text className="text-ui-fg-base">{stats.last_event}</Text>
+            {/* Recent Events Table */}
+            {stats?.recent_events && stats.recent_events.length > 0 && (
+                <div className="mt-8">
+                    <Heading level="h2" className="mb-4">Son Aktiviteler (Son 15 İşlem)</Heading>
+                    <div className="bg-ui-bg-base border border-ui-border-base rounded-lg overflow-hidden">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-ui-bg-subtle border-b border-ui-border-base text-ui-fg-muted">
+                                <tr>
+                                    <th className="px-6 py-4 font-semibold">Tarih</th>
+                                    <th className="px-6 py-4 font-semibold">Aktör</th>
+                                    <th className="px-6 py-4 font-semibold">Eylem</th>
+                                    <th className="px-6 py-4 font-semibold w-full">Detay (İçerik)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-ui-border-base">
+                                {stats.recent_events.map((event) => (
+                                    <tr key={event.id} className="hover:bg-ui-bg-subtle transition-colors">
+                                        <td className="px-6 py-4 text-ui-fg-muted">
+                                            {new Date(event.created_at).toLocaleString("tr-TR")}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge color={event.actor === "system" ? "purple" : event.actor === "ayna" ? "blue" : "grey"}>
+                                                {event.actor}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge color={event.action.includes("error") ? "red" : "green"}>
+                                                {event.action}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 truncate max-w-[400px]" title={event.content}>
+                                            <Text className="truncate text-ui-fg-base">{event.content}</Text>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </Container>

@@ -109,7 +109,12 @@ Both share the same source volume mount, so code changes appear in both without 
 
 ### Ayna Module — AI Agent Architecture
 
-`src/modules/ayna/` is the core AI module. `AynaService` (`service.ts`) orchestrates Gemini function-calling with a set of tools in `tools/`.
+`src/modules/ayna/` is the core AI module. `AynaService` (`service.ts`) orchestrates AI logic via `HybridAIProviderService`.
+
+**100% Open Source AI (Ollama)**: As of 2026-06, Gemini has been completely removed to ensure zero data-leakage and no quota limits. The system relies purely on a self-hosted Ollama backend (`OLLAMA_API_URL`):
+- `qwen2.5:7b` (or similar) is used for standard text and function-calling (`OLLAMA_CHAT_MODEL`).
+- `nomic-embed-text` is used for vector embeddings (`OLLAMA_EMBED_MODEL`).
+- `llava` (or `llama3.2-vision`) is triggered automatically when the user uploads an image (`OLLAMA_VISION_MODEL`).
 
 **Memory system (three layers):**
 - `MemoryTruth` — immutable event log, never deleted
@@ -122,12 +127,16 @@ Both share the same source volume mount, so code changes appear in both without 
 - **Global Tools:** `search_products`, `check_inventory`, `conscience_check`.
 - **Pool Sector Tools:** `calculatePoolChemicals`, `volumeCalculator`.
 - **Vape Sector Tools:** `vapeCalculator` (Nic-Shot / Base liquid mixer).
-- **Admin Tools (All Sectors):** `create_product`, `create_category`, `manage_inventory`, `create_campaign`, `create_blog_post`, `track_order`, `generate_storefront_data` (Auto-Store Generator), `system_audit`, `system_auto_fix`, `predict_stock_shortage`.
+- **Admin Tools (All Sectors):** `create_product`, `create_category`, `manage_inventory`, `create_campaign`, `create_blog_post`, `track_order`, `generate_storefront_data` (Auto-Store Generator), `system_audit`, `system_auto_fix`, `predict_stock_shortage`, `create_mission` (autonomous AI tasks), `analyze_traffic` (GA4 integration).
 
-**Fallback AI:** When Gemini returns 429 or 500, the service falls back to the Ollama endpoint configured in `.env` (`OLLAMA_API_URL`, `OLLAMA_MODEL_NAME`).
+**Storefront Multi-Modal Chat:**
+The frontend chat widget (`storefront/src/modules/chat/components/chat-widget.tsx`) supports image uploads. Images are sent as Base64 via the Next.js proxy to the backend, which dynamically routes them to the Vision model for physical product identification.
+
+**Smart Analytics (GA4):**
+The `GA4Service` (`src/lib/analytics/ga4-service.ts`) provides active user, session, and pageview data. If `.env` keys (`GA4_PROPERTY_ID`, `GA4_CLIENT_EMAIL`, `GA4_PRIVATE_KEY`) are missing, it falls back to Mock Simulation Mode. Ayna uses this data to proactively propose `create_mission` tasks (e.g., creating SEO blog posts for low-traffic pages).
 
 **Dual endpoints:**
-- `POST /store/ayna/chat` — customer-facing, optional auth
+- `POST /store/ayna/chat` — customer-facing, optional auth (supports `image` payload)
 - `POST /admin/ayna/chat` — admin mode, all tools unlocked, JWT required
 
 ### Workflow SDK (Saga Pattern)

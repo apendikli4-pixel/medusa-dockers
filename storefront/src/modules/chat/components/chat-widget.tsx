@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, KeyboardEvent } from "react"
+import React, { useState, KeyboardEvent, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageCircle, X, Send, Bot, User, Trash2 } from "lucide-react"
+import { MessageCircle, X, Send, Bot, User, Trash2, Camera } from "lucide-react"
 import { useAynaChat } from "../hooks/use-ayna-chat"
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
@@ -26,11 +26,25 @@ export default function ChatWidget() {
     } = useAynaChat()
     
     const [inputValue, setInputValue] = useState("")
+    const [selectedImage, setSelectedImage] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setSelectedImage(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
 
     const handleSend = () => {
-        if (!inputValue.trim() || isLoading) return
-        sendMessage(inputValue)
+        if ((!inputValue.trim() && !selectedImage) || isLoading) return
+        sendMessage(inputValue, selectedImage || undefined)
         setInputValue("")
+        setSelectedImage(null)
     }
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -152,19 +166,45 @@ export default function ChatWidget() {
 
                         {/* Input Area */}
                         <div className="p-3 bg-white/90 backdrop-blur-md border-t border-gray-100">
+                            {selectedImage && (
+                                <div className="mb-2 relative inline-block">
+                                    <img src={selectedImage} alt="Preview" className="h-16 w-16 object-cover rounded-md border border-gray-200 shadow-sm" />
+                                    <button 
+                                        onClick={() => setSelectedImage(null)}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600 transition-colors"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            )}
                             <div className="relative flex items-center">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isLoading}
+                                    className="absolute left-1.5 p-2 text-gray-400 hover:text-blue-500 transition-colors z-10"
+                                    title="Fotoğraf Yükle"
+                                >
+                                    <Camera size={20} />
+                                </button>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                    onChange={handleFileChange} 
+                                />
                                 <input
                                     type="text"
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ayna'ya bir soru sorun..."
-                                    className="w-full rounded-full bg-gray-100/80 border-transparent py-3.5 pl-5 pr-12 text-[0.95rem] text-gray-800 placeholder-gray-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-inner"
+                                    className="w-full rounded-full bg-gray-100/80 border-transparent py-3.5 pl-10 pr-12 text-[0.95rem] text-gray-800 placeholder-gray-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-inner"
                                     disabled={isLoading}
                                 />
                                 <button
                                     onClick={handleSend}
-                                    disabled={!inputValue.trim() || isLoading}
+                                    disabled={(!inputValue.trim() && !selectedImage) || isLoading}
                                     aria-label="Mesaj gönder"
                                     style={{ background: "var(--ag-primary)" }}
                                     className="absolute right-1.5 p-2.5 rounded-full text-white transition-all hover:opacity-90 disabled:opacity-50 shadow-md transform hover:scale-105 active:scale-95"

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { Metadata } from "next"
+import { renderContent } from "@/lib/markdown"
 
 async function getPageBySlug(slug: string) {
     // Server-side fetch: Docker internal host (MEDUSA_BACKEND_URL) önceliklidir;
@@ -80,9 +81,9 @@ export default async function CMSPage({
                   In a production setting, this should be sanitized, but as it's from our own Admin CMS, it's generally safe.
                   We use the Tailwind Typography 'prose' class for perfect text styling.
                 */}
-                <div 
+                <div
                     className="prose prose-slate prose-lg max-w-none prose-headings:font-heading prose-headings:text-slate-900 prose-a:text-[#c2410c] hover:prose-a:text-slate-900 prose-a:transition-colors"
-                    dangerouslySetInnerHTML={{ __html: page.content || "" }}
+                    dangerouslySetInnerHTML={{ __html: renderContent(page.content || "") }}
                 />
             </article>
         </main>

@@ -143,12 +143,17 @@ services:
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-290000}
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tnt_default}
+      # Yüklenen görsellerin public adresi (yerel dosya deposu için)
+      FILE_PUBLIC_URL: ${PUBLIC_BACKEND_URL:-http://localhost:9000}
       NODE_OPTIONS: --max-old-space-size=4096
       # Coolify magic: backend'e ayrı subdomain ata, Traefik 9000'e yönlendirir
       # https:// → Coolify/Traefik Let's Encrypt sertifikası alır (admin login için şart)
       SERVICE_FQDN_MEDUSASERVER_9000: https://api.141.98.48.155.sslip.io
     expose:
       - "9000"
+    volumes:
+      # Yüklenen görseller kalıcı olsun (deploy/restart'ta silinmesin)
+      - uploads_data:/server/.medusa/server/static
     networks:
       - medusa_network
 
@@ -224,6 +229,7 @@ volumes:
   redis_data:
   meilisearch_data:
   ollama_data:
+  uploads_data:
 
 networks:
   medusa_network:

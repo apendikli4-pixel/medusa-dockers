@@ -5,6 +5,7 @@ import {
     Waves, ChevronRight, CreditCard, Lock,
 } from "lucide-react"
 import NewsletterForm from "./NewsletterForm"
+import CargoTracking from "./CargoTracking"
 
 // Marka logoları lucide-react'in bu sürümünde yok → inline SVG (24x24).
 const IgIcon = (p: { className?: string }) => (
@@ -182,6 +183,13 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Kargo Takip bandı */}
+                    <div className="py-10 border-b border-white/10">
+                        <div className="max-w-2xl">
+                            <CargoTracking />
+                        </div>
                     </div>
 
                     {/* Link sütunları + iletişim */}

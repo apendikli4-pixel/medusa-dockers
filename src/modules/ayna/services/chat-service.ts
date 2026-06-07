@@ -24,6 +24,8 @@ import { vapeCalculatorTool } from "../tools/vape-calculator-tool"
 import { sizeGuideTool } from "../tools/size-guide-tool"
 import { deviceCompatibilityTool } from "../tools/device-compatibility-tool"
 import { villaSearchTool } from "../tools/villa-search-tool"
+import { createMissionTool } from "../tools/create_mission"
+import { analyzeTrafficTool } from "../tools/analyze_traffic"
 
 // Statik diziler kaldırıldı. Dinamik oluşturucu fonksiyon:
 function getToolsForSector(sector: string, isAdmin: boolean) {
@@ -66,7 +68,8 @@ function getToolsForSector(sector: string, isAdmin: boolean) {
             inventoryManagerTool,
             quickOrderTool,
             productCreateTool,
-            storeGeneratorTool
+            storeGeneratorTool,
+            createMissionTool
         ]
     }
     
@@ -188,13 +191,16 @@ export default class AynaChatService {
         const sector = options.tenantSector || "retail"
         const dynamicTools = getToolsForSector(sector, isAdmin)
         
-        const genOptions = {
+        const genOptions: any = {
             temperature: 0.7,
             maxTokens: 1000,
             responseFormat: "text" as const,
             tools: dynamicTools
         }
 
+        if (options.image) {
+            genOptions.images = [options.image];
+        }
         // 1. Get History/Insights
         const history: any[] = []
         if (options.customerId) {

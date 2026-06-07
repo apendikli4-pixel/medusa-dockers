@@ -78,6 +78,7 @@ export interface AIGenerateOptions {
     maxTokens?: number
     responseFormat?: "text" | "json"
     tools?: any[]
+    images?: string[] // Base64 encoded images
 }
 
 export interface AIStructuredOptions extends AIGenerateOptions {
@@ -91,6 +92,7 @@ export interface AIEmbedOptions {
 export class HybridAIProviderService {
     protected ollamaBaseUrl: string
     protected ollamaModel: string
+    protected ollamaVisionModel: string
     protected embedModel: string
     protected logger: Logger
 
@@ -98,6 +100,10 @@ export class HybridAIProviderService {
         this.logger = logger
 
         this.ollamaBaseUrl = process.env.OLLAMA_API_URL || "http://host.docker.internal:11434"
+        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen2.5:7b"
+        // Görsel işleme için ayrı bir model kullanılabilir (örneğin llava veya llama3.2-vision)
+        this.ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "llava"
+        this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
         // Sohbet için ayrı (daha hızlı) model: OLLAMA_CHAT_MODEL. Yoksa ana modele düşer.
         // Sohbet interaktif olduğu için CPU sunucuda 7B tercih edilir; blog/içerik üretimi
         // (ollama-client üzerinden) 14B kalitesinde kalır.
@@ -177,11 +183,18 @@ export class HybridAIProviderService {
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
-        const { temperature = 0.7, maxTokens = 1000, tools = [] } = options
+        const { temperature = 0.7, maxTokens = 1000, tools = [], images } = options
+
+        const modelToUse = (images && images.length > 0) ? this.ollamaVisionModel : this.ollamaModel;
+
+        const message: any = { role: "user", content: prompt }
+        if (images && images.length > 0) {
+            message.images = images
+        }
 
         const body: any = {
-            model: this.ollamaModel,
-            messages: [{ role: "user", content: prompt }],
+            model: modelToUse,
+            messages: [message],
             stream: false,
             tools: this.toOllamaTools(tools),
             options: {
@@ -252,10 +265,12 @@ export class HybridAIProviderService {
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
-        const { temperature = 0.7, maxTokens = 1000, responseFormat = "text" } = options
+        const { temperature = 0.7, maxTokens = 1000, responseFormat = "text", images } = options
+
+        const modelToUse = (images && images.length > 0) ? this.ollamaVisionModel : this.ollamaModel;
 
         const ollamaOptions: any = {
-            model: this.ollamaModel,
+            model: modelToUse,
             prompt,
             stream: false,
             options: {
@@ -263,6 +278,11 @@ export class HybridAIProviderService {
                 num_predict: maxTokens,
             },
         }
+        
+        if (images && images.length > 0) {
+            ollamaOptions.images = images;
+        }
+
         if (responseFormat === "json") {
             ollamaOptions.format = "json"
         }

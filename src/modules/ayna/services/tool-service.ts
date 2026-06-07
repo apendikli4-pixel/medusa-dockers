@@ -10,6 +10,7 @@ type InjectedDependencies = {
     aynaMemoryService: AynaMemoryService
     aynaDiagnosticService: AynaDiagnosticService
     aynaStockIntelligenceService: AynaStockIntelligenceService
+    aynaService?: any
 }
 
 export default class AynaToolService {
@@ -17,12 +18,14 @@ export default class AynaToolService {
     protected memoryService_: AynaMemoryService
     protected diagnosticService_: AynaDiagnosticService
     protected stockIntelligenceService_: AynaStockIntelligenceService
+    protected aynaService_: any
 
-    constructor({ logger, aynaMemoryService, aynaDiagnosticService, aynaStockIntelligenceService }: InjectedDependencies) {
+    constructor({ logger, aynaMemoryService, aynaDiagnosticService, aynaStockIntelligenceService, aynaService }: InjectedDependencies) {
         this.logger_ = logger
         this.memoryService_ = aynaMemoryService
         this.diagnosticService_ = aynaDiagnosticService
         this.stockIntelligenceService_ = aynaStockIntelligenceService
+        this.aynaService_ = aynaService
     }
 
     async handleToolCall(
@@ -98,6 +101,12 @@ export default class AynaToolService {
             case "generate_storefront_data":
                 if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
                 return await this.executeStoreGenerator(args, services)
+            case "create_mission":
+                if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
+                return await this.executeCreateMission(args, services)
+            case "analyze_traffic":
+                if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
+                return await this.executeAnalyzeTraffic(args)
 
             default:
                 return { error: `Unknown tool: ${toolName}` }
@@ -675,6 +684,79 @@ export default class AynaToolService {
             }
         } catch (e: any) {
             return { error: `Mağaza oluşturma hatası: ${e.message}` }
+        }
+    }
+
+    /**
+     * AI Görevi (Mission) oluşturur.
+     */
+    private async executeCreateMission(args: Record<string, any>, services: any) {
+        try {
+            if (!this.aynaService_) {
+                return { error: "Ayna service is not available for creating missions." }
+            }
+
+            let resultIntentObj = null;
+            if (args.result_intent_payload) {
+                try {
+                    resultIntentObj = JSON.parse(args.result_intent_payload);
+                } catch (e) {
+                    this.logger_.warn(`[AynaTool] Invalid JSON in result_intent_payload: ${args.result_intent_payload}`);
+                }
+            }
+
+            const missionData = {
+                title: args.title,
+                description: args.description,
+                priority: args.priority || "medium",
+                status: "pending",
+                result: {
+                    action: args.result_intent_action,
+                    payload: resultIntentObj
+                }
+            };
+
+            const mission = await this.aynaService_.createMissions(missionData);
+
+            await this.memoryService_.recordTruth("ayna", "mission_created", {
+                mission_id: mission.id,
+                title: mission.title,
+            });
+
+            return {
+                success: true,
+                message: "Görev başarıyla oluşturuldu ve Admin onayına sunuldu.",
+                mission_id: mission.id
+            }
+        } catch (e: any) {
+            return { error: `Görev oluşturma hatası: ${e.message}` }
+        }
+    }
+
+    /**
+     * GA4 Trafik Analiz aracı
+     */
+    private async executeAnalyzeTraffic(args: Record<string, any>) {
+        try {
+            const days = args.days || 7;
+            const { ga4Service } = require("../../../lib/analytics/ga4-service");
+            
+            const stats = await ga4Service.getTrafficStats(days);
+            const topPages = await ga4Service.getTopPages(days, 5);
+
+            return {
+                success: true,
+                days,
+                data: {
+                    stats,
+                    topPages
+                },
+                message: stats.isMock 
+                    ? "UYARI: Google Analytics anahtarları eksik olduğundan bu veriler SİMÜLASYONDUR. Sistem yöneticisinin .env dosyasına GA4_PROPERTY_ID ve GA4_PRIVATE_KEY girmesi gerekmektedir. Analizi yaparken verilerin gerçek olmadığını belirtin." 
+                    : "Gerçek GA4 verileri başarıyla çekildi."
+            };
+        } catch (e: any) {
+            return { error: `Trafik verisi alınamadı: ${e.message}` };
         }
     }
 }

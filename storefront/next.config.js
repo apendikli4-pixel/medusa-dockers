@@ -6,6 +6,9 @@ const nextConfig = {
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "medusa-public-images.s3.eu-west-1.amazonaws.com" },
       { protocol: "http", hostname: "localhost" },
+      // Self-hosted yüklenen görseller (backend /static)
+      { protocol: "https", hostname: "api.141.98.48.155.sslip.io" },
+      { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
   // Server-only env vars (not exposed to client)

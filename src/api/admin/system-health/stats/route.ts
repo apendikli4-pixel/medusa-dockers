@@ -20,9 +20,16 @@ export const GET = async (
         const stats = {
             total_events: count,
             last_24h_events: events.filter((e: any) => new Date(e.created_at) > last24h).length,
-            error_count: events.filter((e: any) => e.content.includes("error") || e.content.includes("failed")).length,
-            success_rate: count > 0 ? Math.round(((count - events.filter((e: any) => e.content.includes("error")).length) / count) * 100) : 100,
-            last_event: events.length > 0 ? events[0].content : "Henüz olay yok"
+            error_count: events.filter((e: any) => e.content.includes("error") || e.content.includes("failed") || e.action.includes("error")).length,
+            success_rate: count > 0 ? Math.round(((count - events.filter((e: any) => e.content.includes("error") || e.action.includes("error")).length) / count) * 100) : 100,
+            last_event: events.length > 0 ? events[0].content : "Henüz olay yok",
+            recent_events: events.slice(0, 15).map((e: any) => ({
+                id: e.id,
+                created_at: e.created_at,
+                actor: e.actor,
+                action: e.action,
+                content: e.content
+            }))
         }
 
         res.json(stats)

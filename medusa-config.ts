@@ -81,17 +81,31 @@ export default defineConfig({
         file: {
             resolve: "@medusajs/file",
             options: {
-                providers: [
-                    {
-                        resolve: "./src/providers/cloudinary",
-                        id: "cloudinary",
-                        options: {
-                            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-                            api_key: process.env.CLOUDINARY_API_KEY,
-                            api_secret: process.env.CLOUDINARY_API_SECRET,
-                        }
-                    }
-                ]
+                // Cloudinary anahtarları varsa Cloudinary; yoksa self-hosted yerel
+                // dosya deposu (sunucuda 'static' dizini, kalıcı volume ile).
+                providers: process.env.CLOUDINARY_CLOUD_NAME
+                    ? [
+                        {
+                            resolve: "./src/providers/cloudinary",
+                            id: "cloudinary",
+                            options: {
+                                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+                                api_key: process.env.CLOUDINARY_API_KEY,
+                                api_secret: process.env.CLOUDINARY_API_SECRET,
+                            },
+                        },
+                    ]
+                    : [
+                        {
+                            resolve: "@medusajs/file-local",
+                            id: "local",
+                            options: {
+                                upload_dir: "static",
+                                // Yüklenen görsellerin public URL'i (storefront bu adresten çeker)
+                                backend_url: `${process.env.FILE_PUBLIC_URL || "http://localhost:9000"}/static`,
+                            },
+                        },
+                    ],
             },
         },
         ayna: {

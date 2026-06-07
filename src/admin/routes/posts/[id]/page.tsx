@@ -11,6 +11,7 @@ const EditPostPage = () => {
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
     const [aiLoading, setAiLoading] = useState(false)
+    const [uploading, setUploading] = useState(false)
 
     const [formData, setFormData] = useState({
         title: "",
@@ -47,6 +48,33 @@ const EditPostPage = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
+    }
+
+    // Sisteme dosya (görsel) yükle → /admin/uploads → dönen URL'i image alanına yaz.
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (!file.type.startsWith("image/")) {
+            toast.error("Lütfen bir görsel dosyası seçin.")
+            return
+        }
+        setUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("files", file)
+            const res = await fetch("/admin/uploads", { method: "POST", body: fd, credentials: "include" })
+            if (!res.ok) throw new Error(`Yükleme başarısız (${res.status})`)
+            const data = await res.json()
+            const url = data?.files?.[0]?.url || data?.uploads?.[0]?.url
+            if (!url) throw new Error("Sunucudan görsel adresi alınamadı")
+            setFormData(prev => ({ ...prev, image: url }))
+            toast.success("Görsel yüklendi! 🖼️")
+        } catch (err: any) {
+            toast.error("Görsel yüklenemedi: " + (err?.message || "bilinmeyen hata"))
+        } finally {
+            setUploading(false)
+            e.target.value = ""
+        }
     }
 
     const handleAIGenerate = async () => {
@@ -196,10 +224,32 @@ const EditPostPage = () => {
                     </div>
                 </div>
 
-                {/* IMAGE */}
+                {/* IMAGE — URL yapıştır VEYA sisteme dosya yükle */}
                 <div className="flex flex-col gap-2">
-                    <Label htmlFor="image">Kapak Görseli (URL)</Label>
-                    <Input id="image" name="image" value={formData.image} onChange={handleChange} />
+                    <Label htmlFor="image">Kapak Görseli</Label>
+                    <div className="flex gap-2 items-center">
+                        <Input
+                            id="image"
+                            name="image"
+                            value={formData.image}
+                            onChange={handleChange}
+                            placeholder="Görsel URL'i yapıştırın veya sağdan dosya yükleyin"
+                        />
+                        <label
+                            className="shrink-0 cursor-pointer px-4 py-2 rounded-md border border-ui-border-base bg-ui-bg-base hover:bg-ui-bg-base-hover text-sm font-medium whitespace-nowrap transition-colors"
+                            title="Bilgisayarından görsel yükle"
+                        >
+                            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                            {uploading ? "Yükleniyor..." : "📤 Dosya Yükle"}
+                        </label>
+                    </div>
+                    {formData.image && (
+                        <img
+                            src={formData.image}
+                            alt="Kapak önizleme"
+                            style={{ maxHeight: 140, borderRadius: 8, marginTop: 8, objectFit: "cover", border: "1px solid var(--border-base, #e5e7eb)" }}
+                        />
+                    )}
                 </div>
 
                 {/* AI BUTTON */}
