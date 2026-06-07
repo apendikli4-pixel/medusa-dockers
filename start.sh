@@ -72,14 +72,25 @@ if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ];
         echo "Production environment detected. Skipping redundant build..."
     fi
     echo "Starting Medusa..."
-    # Admin SPA build'i production imajında bulunmayabiliyor (admin-bundler dist/index.html
-    # eksik → 'Could not find index.html' ile crash loop). DISABLE_MEDUSA_ADMIN=true ise
-    # admin'i hiç serve etme; backend yalnızca /store + /admin API'lerini sunar.
+    # ── Admin Panel Serve Stratejisi ──
+    # Resmi Medusa V2 kuralı: admin'i serve etmek için 'medusa start' MUTLAKA
+    # .medusa/server dizininden çalıştırılmalı (aksi halde 'Could not find
+    # index.html in admin build directory' → crash loop).
+    #   - DISABLE_MEDUSA_ADMIN=true  → API-only (güvenli mod), /server'dan.
+    #   - aksi halde + admin build varsa → .medusa/server'dan (admin AÇIK).
+    #   - admin build yoksa → güvenli API-only'a düş (brick olmaz).
     if [ "${DISABLE_MEDUSA_ADMIN}" = "true" ]; then
-        echo "Admin SPA disabled (DISABLE_MEDUSA_ADMIN=true) — API-only mode."
+        echo "Admin disabled (DISABLE_MEDUSA_ADMIN=true) — API-only mode (/server)."
         MEDUSA_ADMIN_DISABLED=true ./node_modules/.bin/medusa start &
+    elif [ -f "/server/.medusa/server/public/admin/index.html" ]; then
+        echo "Admin ENABLED — .medusa/server dizininden başlatılıyor (admin serve)."
+        # .medusa/server'ın kendi node_modules'u yok; kök node_modules'u symlink'le.
+        ln -sfn /server/node_modules /server/.medusa/server/node_modules
+        cd /server/.medusa/server
+        /server/node_modules/.bin/medusa start &
     else
-        ./node_modules/.bin/medusa start &
+        echo "Admin build bulunamadı — güvenli API-only moda düşülüyor."
+        MEDUSA_ADMIN_DISABLED=true ./node_modules/.bin/medusa start &
     fi
     PID=$!
     echo "Medusa started with PID $PID. Waiting..."
