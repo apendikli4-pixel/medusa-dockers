@@ -98,7 +98,10 @@ export class HybridAIProviderService {
         this.logger = logger
 
         this.ollamaBaseUrl = process.env.OLLAMA_API_URL || "http://host.docker.internal:11434"
-        this.ollamaModel = process.env.OLLAMA_MODEL_NAME || "qwen2.5:14b"
+        // Sohbet için ayrı (daha hızlı) model: OLLAMA_CHAT_MODEL. Yoksa ana modele düşer.
+        // Sohbet interaktif olduğu için CPU sunucuda 7B tercih edilir; blog/içerik üretimi
+        // (ollama-client üzerinden) 14B kalitesinde kalır.
+        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen2.5:7b"
         // Embedding için ayrı, hafif bir model kullanmak idealdir (nomic-embed-text).
         // Yoksa ana modele düşer.
         this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
