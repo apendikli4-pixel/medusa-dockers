@@ -121,8 +121,15 @@ export default class AynaToolService {
         // Fiyat varyantın price_set.prices içinden TRY olanından alınır.
         const simplify = (products: any[]) =>
             (products || []).map((p: any) => {
-                const prices = p?.variants?.[0]?.price_set?.prices || []
+                const variants = p?.variants || []
+                const prices = variants?.[0]?.price_set?.prices || []
                 const tryPrice = prices.find((pr: any) => pr.currency_code === "try")
+                // Stok durumu: Bir varyant stok takibi yapmıyorsa (manage_inventory=false)
+                // ürün her zaman satılabilir → stokta. Takip ediyorsa miktar > 0 ise stokta.
+                const inStock = variants.some((v: any) =>
+                    v?.manage_inventory === false ||
+                    (typeof v?.inventory_quantity === "number" && v.inventory_quantity > 0)
+                )
                 return {
                     id: p.id,
                     title: p.title,
@@ -131,6 +138,7 @@ export default class AynaToolService {
                     description: p.description,
                     price: tryPrice ? tryPrice.amount : null,
                     currency: tryPrice ? "TRY" : null,
+                    in_stock: variants.length > 0 ? inStock : true,
                 }
             })
 
@@ -145,6 +153,7 @@ export default class AynaToolService {
                     fields: [
                         "id", "title", "handle", "status", "description",
                         "variants.id", "variants.title",
+                        "variants.manage_inventory", "variants.inventory_quantity",
                         "variants.price_set.prices.amount",
                         "variants.price_set.prices.currency_code",
                     ],
