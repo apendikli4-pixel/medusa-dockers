@@ -37,8 +37,9 @@ medusa db:migrate || { echo "Migrations failed"; exit 1; }
 # kargo + demo ürünler. Script "zaten var mı" kontrolü yaptığı için tekrar
 # çalıştırmak güvenlidir. Hata olursa container çökmesin (non-fatal).
 if [ "${RUN_PRODUCTION_SEED}" = "true" ] && { [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; }; then
-    echo "RUN_PRODUCTION_SEED=true → production seed çalıştırılıyor (idempotent)..."
-    ./node_modules/.bin/medusa exec ./src/scripts/seed-production.ts || echo "Seed başarısız oldu (devam ediliyor; non-fatal)."
+    echo "RUN_PRODUCTION_SEED=true → production seed çalıştırılıyor (idempotent, max 240s)..."
+    # timeout ile sarmalandı: seed takılsa bile medusa start'ı bloke etmesin (server brick olmaz).
+    timeout 240 ./node_modules/.bin/medusa exec ./src/scripts/seed-production.ts || echo "Seed başarısız/timeout (devam ediliyor; non-fatal)."
 fi
 
 if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then

@@ -114,44 +114,65 @@ export default class AynaToolService {
         remoteQuery?: RemoteQueryFunction,
         tenantId?: string
     ) {
+        const limit = args.limit || 5
+        const q = args.query
+
+        // Bir ürün listesini fiyatla birlikte sade forma indirger.
+        // Fiyat varyantın price_set.prices içinden TRY olanından alınır.
+        const simplify = (products: any[]) =>
+            (products || []).map((p: any) => {
+                const prices = p?.variants?.[0]?.price_set?.prices || []
+                const tryPrice = prices.find((pr: any) => pr.currency_code === "try")
+                return {
+                    id: p.id,
+                    title: p.title,
+                    handle: p.handle,
+                    status: p.status,
+                    description: p.description,
+                    price: tryPrice ? tryPrice.amount : null,
+                    currency: tryPrice ? "TRY" : null,
+                }
+            })
+
         try {
-            // Tenant filtresi varsa remoteQuery ile tenant-scoped arama yap
-            if (tenantId && remoteQuery) {
+            // Birincil yol: remoteQuery ile ürünleri FİYATLARIYLA çek.
+            // NOT: Doğrudan tenant-product link'i mimaride devre dışı (sales-channel
+            // tabanlı izolasyona geçildi). Tek-kiracılı kurulumda global arama doğrudur;
+            // çok-kiracılıda sales-channel filtresi ileride eklenebilir.
+            if (remoteQuery) {
                 const { data: products } = await (remoteQuery as any).graph({
                     entity: "product",
-                    fields: ["id", "title", "handle", "status", "description"],
+                    fields: [
+                        "id", "title", "handle", "status", "description",
+                        "variants.id", "variants.title",
+                        "variants.price_set.prices.amount",
+                        "variants.price_set.prices.currency_code",
+                    ],
                     filters: {
-                        ...(args.query ? { title: { $ilike: `%${args.query}%` } } : {}),
-                        tenant: { tenant_id: tenantId },
+                        ...(q ? { title: { $ilike: `%${q}%` } } : {}),
+                        status: "published",
                     },
-                    pagination: { take: args.limit || 5 }
+                    pagination: { take: limit },
                 })
+                const simplified = simplify(products)
                 await this.memoryService_.recordTruth("system", "product_search", {
-                    query: args.query, resultCount: products?.length || 0, tenantId
+                    query: q, resultCount: simplified.length, tenantId: tenantId || null,
                 })
-                return { products: products || [], count: products?.length || 0, tenantScoped: true }
+                return { products: simplified, count: simplified.length }
             }
 
-            // Tenant yoksa global arama
+            // Yedek yol: productModuleService (fiyatsız — son çare).
             if (productModuleService) {
                 const products = await productModuleService.listProducts(
-                    { q: args.query },
-                    { take: args.limit || 5, select: ["id", "title", "handle", "status"] }
+                    q ? { q } : {},
+                    { take: limit, select: ["id", "title", "handle", "status", "description"] }
                 )
-                await this.memoryService_.recordTruth("system", "product_search", { query: args.query, resultCount: products.length })
-                return { products, count: products.length }
-            }
-            // RemoteQuery fallback
-            if (remoteQuery) {
-                const filters = args.query ? { title: { $ilike: `%${args.query}%` } } : undefined
-                const { data: products } = await (remoteQuery as any).graph({
-                    entity: "product",
-                    fields: ["id", "title", "handle", "status"],
-                    filters,
-                    pagination: { take: args.limit || 5 }
+                await this.memoryService_.recordTruth("system", "product_search", {
+                    query: q, resultCount: products.length, tenantId: tenantId || null,
                 })
-                return { products: products || [], count: products?.length || 0 }
+                return { products, count: products.length, note: "Fiyat bilgisi alınamadı (query service yok)." }
             }
+
             return { error: "Product service unavailable" }
         } catch (e: any) {
             return { error: e.message }

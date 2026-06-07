@@ -56,5 +56,29 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         out.salesChannelError = e.message
     }
 
+    // ─── Tenant durumu + opsiyonel oluşturma ───
+    // ?action=ensure-tenant ile tenant yoksa oluşturur (tek-kiracılı kurulum).
+    try {
+        const tenantSvc = req.scope.resolve("tenant") as any
+        let tenants = await tenantSvc.listTenants({}, { take: 5 })
+        if ((!tenants || tenants.length === 0) && req.query.action === "ensure-tenant") {
+            const created = await tenantSvc.createTenants({
+                name: "Aqua Havuz",
+                slug: "aqua-havuz",
+                sector: "retail",
+                is_active: true,
+            })
+            const t = Array.isArray(created) ? created[0] : created
+            tenants = [t]
+            out.tenantCreated = true
+        }
+        out.tenantCount = tenants?.length || 0
+        out.tenants = (tenants || []).map((t: any) => ({
+            id: t.id, slug: t.slug, sector: t.sector, is_active: t.is_active,
+        }))
+    } catch (e: any) {
+        out.tenantError = e.message
+    }
+
     return res.json(out)
 }
