@@ -1,39 +1,43 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { BLOG_MODULE } from "../../../modules/blog"
-import type BlogModuleService from "../../../modules/blog/service"
+import { CONTENT_ENGINE_MODULE } from "../../../modules/content_engine"
 
 /**
  * GET /store/blog
  * Yayınlanmış blog yazılarını listeler (storefront blog sayfası için).
  *
- * Query: limit, offset
- * Yanıt: { posts, count, limit, offset }
+ * NOT: Admin "Blog" arayüzü (/admin/posts) content_engine modülüne yazıyor.
+ * Storefront da AYNI modülü okur ki yayınlanan yazılar anında görünsün.
+ * (Eski ayrı `blog` modülü yerine content_engine — tek kaynak.)
  *
- * Sadece status="published" döner (taslaklar gizli).
+ * Query: limit, offset
+ * Yanıt: { posts, count, limit, offset } — sadece status="published"
  */
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-    const blogService = req.scope.resolve(BLOG_MODULE) as BlogModuleService
+    const content = req.scope.resolve(CONTENT_ENGINE_MODULE) as any
 
     const limit = parseInt((req.query.limit as string) || "20", 10)
     const offset = parseInt((req.query.offset as string) || "0", 10)
 
-    const [posts, count] = await blogService.listAndCountBlogPosts(
+    const [posts, count] = await content.listAndCountPosts(
         { status: "published" },
         {
-            select: [
-                "id",
-                "slug",
-                "title",
-                "excerpt",
-                "thumbnail",
-                "published_at",
-                "ai_generated",
-            ],
+            select: ["id", "slug", "title", "excerpt", "image", "published_at", "created_at"],
             skip: offset,
             take: limit,
-            order: { published_at: "DESC" },
+            order: { created_at: "DESC" },
         }
     )
 
-    res.json({ posts, count, limit, offset })
+    // Storefront blog şemasına eşle (thumbnail = image, published_at fallback).
+    const mapped = (posts || []).map((p: any) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        excerpt: p.excerpt,
+        thumbnail: p.image || null,
+        published_at: p.published_at || p.created_at,
+        ai_generated: true,
+    }))
+
+    res.json({ posts: mapped, count, limit, offset })
 }
