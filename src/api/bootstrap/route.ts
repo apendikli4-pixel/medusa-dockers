@@ -67,6 +67,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
                 slug: "aqua-havuz",
                 sector: "retail",
                 is_active: true,
+                features: [],
+                settings: {},
+                metadata: {},
             })
             const t = Array.isArray(created) ? created[0] : created
             tenants = [t]
