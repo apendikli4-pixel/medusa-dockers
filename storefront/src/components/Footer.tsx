@@ -197,7 +197,7 @@ export default function Footer({ countryCode }: { countryCode: string }) {
                             <ul className="space-y-3 text-sm text-white/60">
                                 <li className="flex items-center gap-3">
                                     <User size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                    <span className="font-medium text-white/80">Mustafa Gürçüler</span>
+                                    <span className="font-medium text-white/80">Mustafa Gürcüler</span>
                                 </li>
                                 <li className="flex items-start gap-3">
                                     <MapPin size={18} className="mt-0.5 shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
