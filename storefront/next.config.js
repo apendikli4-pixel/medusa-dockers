@@ -33,7 +33,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://res.cloudinary.com https://medusa-public-images.s3.eu-west-1.amazonaws.com; connect-src 'self' http://localhost:9000 http://localhost:8000 wss://*; font-src 'self' data:;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: https://res.cloudinary.com https://medusa-public-images.s3.eu-west-1.amazonaws.com; connect-src 'self' https://api.141.98.48.155.sslip.io http://localhost:9000 http://localhost:8000 wss://*; font-src 'self' data:;",
           },
         ],
       },

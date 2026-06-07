@@ -6,6 +6,10 @@ import { getSectorTheme, buildThemeStyle } from "@/lib/themes"
 import ChatWidget from "@/modules/chat/components/chat-widget"
 import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google"
 
+// Production build (next start) için: build sırasında backend'e gidilmesin diye
+// tüm uygulama çalışma anında (SSR) render edilir.
+export const dynamic = "force-dynamic"
+
 const inter = Inter({
     subsets: ["latin", "latin-ext"],
     variable: "--font-inter",

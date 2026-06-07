@@ -1,6 +1,9 @@
 import { MetadataRoute } from 'next'
 import { listBlogPosts } from '@/lib/server/blog'
 
+// Build sırasında backend'e gidilmesin; sitemap çalışma anında üretilir.
+export const dynamic = "force-dynamic"
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
 

@@ -2,6 +2,11 @@ import { ReactNode } from "react"
 import Link from "next/link"
 import Header from "@/components/Header"
 
+// Tüm storefront sayfaları çalışma anında (SSR) render edilir; build sırasında
+// backend'e gidilmez. Bu sayede `next build` backend ayakta olmadan da geçer
+// ve production modunda (`next start`) hızlı/stabil çalışır (next dev kaldırıldı).
+export const dynamic = "force-dynamic"
+
 export default async function CountryLayout({
     children,
     params,

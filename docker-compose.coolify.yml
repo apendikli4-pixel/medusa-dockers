@@ -62,6 +62,13 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    environment:
+      # 32GB RAM koruması: aynı anda RAM'de TEK model tut (7B↔14B birlikte yüklenmez).
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      # Eşzamanlı tek istek → bellek/CPU tepe yükünü sınırla.
+      OLLAMA_NUM_PARALLEL: "1"
+      # Boştaki model 5dk sonra bellekten boşalsın (RAM geri verilir).
+      OLLAMA_KEEP_ALIVE: "5m"
     volumes:
       - ollama_data:/root/.ollama
     expose:
@@ -182,13 +189,20 @@ services:
     build:
       context: ./storefront
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* değerleri build sırasında client bundle'a gömülür.
+      args:
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${PUBLIC_BACKEND_URL}
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
+        NEXT_PUBLIC_BASE_URL: ${PUBLIC_STOREFRONT_URL}
+        NEXT_PUBLIC_SEARCH_ENDPOINT: ${PUBLIC_BACKEND_URL}
     restart: unless-stopped
-    command: ["npm", "run", "dev"]
+    # Production: next start (next dev kaldırıldı — kararsızlık/504 sebebi)
+    command: ["npm", "run", "start"]
     depends_on:
       medusa-server:
         condition: service_started
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       MEDUSA_BACKEND_URL: http://medusa-server:9000
       NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${PUBLIC_BACKEND_URL}
       NEXT_PUBLIC_SEARCH_ENDPOINT: ${PUBLIC_BACKEND_URL}
