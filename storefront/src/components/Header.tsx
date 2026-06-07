@@ -95,17 +95,27 @@ export default async function Header({ countryCode }: { countryCode: string }) {
                             </span>
                         </Link>
                     ) : (
-                        <Link
-                            href={`/${countryCode}/account/login`}
-                            className="relative group transition-opacity hover:opacity-80 py-2"
-                            style={{ color: "var(--ag-text)" }}
-                        >
-                            <span>Giriş Yap</span>
-                            <span
-                                className="absolute left-0 bottom-0 w-0 h-0.5 transition-all duration-300 group-hover:w-full"
-                                style={{ background: "var(--ag-primary)" }}
-                            ></span>
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href={`/${countryCode}/account/login`}
+                                className="relative group transition-opacity hover:opacity-80 py-2 flex items-center gap-2"
+                                style={{ color: "var(--ag-text)" }}
+                            >
+                                <User size={18} style={{ color: "var(--ag-muted)" }} />
+                                <span>Giriş Yap</span>
+                                <span
+                                    className="absolute left-0 bottom-0 w-0 h-0.5 transition-all duration-300 group-hover:w-full"
+                                    style={{ background: "var(--ag-primary)" }}
+                                ></span>
+                            </Link>
+                            <Link
+                                href={`/${countryCode}/account/register`}
+                                className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:opacity-90 border"
+                                style={{ borderColor: "var(--ag-primary)", color: "var(--ag-primary)" }}
+                            >
+                                Üye Ol
+                            </Link>
+                        </div>
                     )}
 
                     <Link
