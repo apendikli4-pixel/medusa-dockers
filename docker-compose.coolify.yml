@@ -138,7 +138,8 @@ services:
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tnt_default}
       NODE_OPTIONS: --max-old-space-size=4096
       # Coolify magic: backend'e ayrı subdomain ata, Traefik 9000'e yönlendirir
-      SERVICE_FQDN_MEDUSASERVER_9000: /
+      # https:// → Coolify/Traefik Let's Encrypt sertifikası alır (admin login için şart)
+      SERVICE_FQDN_MEDUSASERVER_9000: https://api.141.98.48.155.sslip.io
     expose:
       - "9000"
     networks:
@@ -197,7 +198,8 @@ services:
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       # Coolify magic: storefront'a ana domain ata, Traefik 8000'e yönlendirir
-      SERVICE_FQDN_STOREFRONT_8000: /
+      # https:// → Let's Encrypt sertifikası (güvenli site, checkout için şart)
+      SERVICE_FQDN_STOREFRONT_8000: https://ayna.141.98.48.155.sslip.io
     expose:
       - "8000"
     networks:
