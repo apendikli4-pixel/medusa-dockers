@@ -1,7 +1,7 @@
 import Link from "next/link"
 import {
     ShieldCheck, Truck, RotateCcw, Headphones,
-    Phone, Mail, MapPin,
+    Phone, Mail, MapPin, User,
     Waves, ChevronRight, CreditCard, Lock,
 } from "lucide-react"
 import NewsletterForm from "./NewsletterForm"
@@ -195,14 +195,18 @@ export default function Footer({ countryCode }: { countryCode: string }) {
                         <div className="col-span-2">
                             <h4 className="font-semibold mb-4 text-white/90">İletişim</h4>
                             <ul className="space-y-3 text-sm text-white/60">
+                                <li className="flex items-center gap-3">
+                                    <User size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
+                                    <span className="font-medium text-white/80">Mustafa Gürçüler</span>
+                                </li>
                                 <li className="flex items-start gap-3">
                                     <MapPin size={18} className="mt-0.5 shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                    <span>Sarıçam, Adana / Türkiye</span>
+                                    <span>Kuşadası / Merkez</span>
                                 </li>
                                 <li>
-                                    <a href="tel:+908500000000" className="flex items-center gap-3 hover:text-white transition-colors">
+                                    <a href="tel:+905075613134" className="flex items-center gap-3 hover:text-white transition-colors">
                                         <Phone size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                        0850 000 00 00
+                                        0507 561 31 34
                                     </a>
                                 </li>
                                 <li>
