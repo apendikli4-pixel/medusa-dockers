@@ -114,3 +114,37 @@ export function markdownToHtml(md: string): string {
     closeList()
     return out.join("\n")
 }
+
+/** İçerik markdown değil de HTML mi? (AI bazen doğrudan HTML üretiyor.) */
+export function looksLikeHtml(s: string): boolean {
+    if (!s) return false
+    return /<\/?(p|h[1-6]|div|ul|ol|li|br|strong|em|a|blockquote|img|html|body|section|article|span)\b/i.test(s)
+}
+
+/**
+ * AI'nin ürettiği (bazen tam <html><head><body> sarmallı) HTML'i temizler:
+ * doküman sarmalını ve <head>/<title>'ı atar, <script>/<style> ve inline
+ * event handler'ları (XSS) kaldırır. Geriye güvenli gövde HTML'i kalır.
+ */
+export function sanitizeBlogHtml(raw: string): string {
+    if (!raw) return ""
+    let html = raw
+    html = html.replace(/<head[\s\S]*?<\/head>/gi, "")        // <head>…</head>
+    html = html.replace(/<\/?(?:html|body|head|title|!doctype)[^>]*>/gi, "") // sarmal etiketler
+    html = html.replace(/<script[\s\S]*?<\/script>/gi, "")    // script blokları
+    html = html.replace(/<style[\s\S]*?<\/style>/gi, "")      // style blokları
+    html = html.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, "")     // on*="…"
+    html = html.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, "")     // on*='…'
+    html = html.replace(/javascript:/gi, "")                  // javascript: protokolü
+    return html.trim()
+}
+
+/**
+ * Blog içeriğini uygun şekilde HTML'e dönüştürür:
+ * - İçerik HTML ise → sanitize edilmiş HTML (kaçışsız, gerçek render).
+ * - İçerik markdown ise → markdownToHtml.
+ */
+export function renderContent(content: string): string {
+    if (!content) return ""
+    return looksLikeHtml(content) ? sanitizeBlogHtml(content) : markdownToHtml(content)
+}

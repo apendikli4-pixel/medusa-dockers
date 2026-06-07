@@ -3,7 +3,7 @@ import Image from "next/image"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getBlogPost, listBlogPosts, formatBlogDate } from "@/lib/server/blog"
-import { markdownToHtml } from "@/lib/markdown"
+import { renderContent } from "@/lib/markdown"
 
 export async function generateMetadata({
     params,
@@ -35,7 +35,7 @@ export default async function BlogDetailPage({
     const post = await getBlogPost(slug)
     if (!post) notFound()
 
-    const html = markdownToHtml(post.content)
+    const html = renderContent(post.content)
 
     // İlgili yazılar (kendisi hariç ilk 3)
     const { posts } = await listBlogPosts({ limit: 4 })
