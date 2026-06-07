@@ -24,6 +24,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         res.json({ post: posts[0] })
     } catch (error: any) {
         console.error("Store Blog Detail Error:", error)
-        res.status(500).json({ message: "Internal Error", error: error.message })
+        res.status(500).json({ message: "Internal Error", error: "İşlem sırasında bir hata oluştu." })
     }
 }

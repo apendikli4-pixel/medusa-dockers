@@ -46,6 +46,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const settings = (full?.settings ?? {}) as Record<string, unknown>
     const theme = (settings.theme ?? {}) as Record<string, string>
     const contact = (settings.contact ?? {}) as Record<string, string>
+    const storefront = (settings.storefront ?? {}) as Record<string, any>
 
     return res.json({
         tenant: {
@@ -62,6 +63,11 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
                 phone: contact.phone ?? null,
                 email: contact.email ?? null,
                 address: contact.address ?? null,
+            },
+            storefront: {
+                contact: storefront.contact ?? null,
+                socials: storefront.socials ?? null,
+                links: storefront.links ?? null,
             },
             features: Array.isArray(full?.features) ? (full!.features as string[]) : [],
         },

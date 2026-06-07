@@ -28,15 +28,26 @@ const YtIcon = (p: { className?: string }) => (
     </svg>
 )
 
+import { retrieveCurrentTenant } from "../lib/server/tenant"
+
 /**
- * Aqua Havuz — Modern, su temalı e-ticaret footer'ı.
- * Sektör temasıyla (var(--ag-primary)) uyumlu derin okyanus gradyanı,
- * üstte dalga ayırıcı, bülten kaydı, güven şeridi, link sütunları,
- * iletişim + sosyal medya ve alt bilgi barı.
+ * Aqua Havuz / Dinamik Tenant Footer'ı
  */
-export default function Footer({ countryCode }: { countryCode: string }) {
+export default async function Footer({ countryCode }: { countryCode: string }) {
     const base = `/${countryCode}`
     const year = new Date().getFullYear()
+
+    // Tenant bilgisini çek (yoksa null döner, fallback kullanırız)
+    const tenant = await retrieveCurrentTenant()
+    const sf = tenant?.storefront || {}
+
+    const parseLinks = (str?: string, defaultLinks: {label:string, href:string}[] = []) => {
+        if (!str || !str.trim()) return defaultLinks
+        return str.split('\n').filter(Boolean).map(l => {
+            const [label, href] = l.split('|')
+            return { label: label?.trim(), href: href?.trim() || '#' }
+        }).filter(l => l.label)
+    }
 
     const trust = [
         { icon: ShieldCheck, title: "Güvenli Alışveriş", desc: "256-bit SSL koruması" },
@@ -45,27 +56,27 @@ export default function Footer({ countryCode }: { countryCode: string }) {
         { icon: Headphones, title: "AI Destek", desc: "7/24 Ayna asistan" },
     ]
 
-    const columns: { title: string; links: { label: string; href: string }[] }[] = [
+    const columns = [
         {
             title: "Kurumsal",
-            links: [
+            links: parseLinks(sf.links?.kurumsal, [
                 { label: "Hakkımızda", href: `${base}/pages/hakkimizda` },
                 { label: "İletişim", href: `${base}/pages/iletisim` },
                 { label: "Blog", href: `${base}/blog` },
                 { label: "Sıkça Sorulan Sorular", href: `${base}/pages/sss` },
-            ],
+            ]),
         },
         {
             title: "Müşteri Hizmetleri",
-            links: [
+            links: parseLinks(sf.links?.musteri, [
                 { label: "Hesabım", href: `${base}/account` },
                 { label: "Siparişlerim", href: `${base}/account/orders` },
                 { label: "Sepetim", href: `${base}/cart` },
                 { label: "Üye Ol", href: `${base}/account/register` },
-            ],
+            ]),
         },
         {
-            title: "Kategoriler",
+            title: "Kategoriler", // Kategoriler hala sabit veya eklenebilir
             links: [
                 { label: "Havuz Kimyasalları", href: `${base}` },
                 { label: "Filtre & Pompa", href: `${base}` },
@@ -75,21 +86,28 @@ export default function Footer({ countryCode }: { countryCode: string }) {
         },
         {
             title: "Yasal",
-            links: [
+            links: parseLinks(sf.links?.yasal, [
                 { label: "Gizlilik Politikası", href: `${base}/pages/gizlilik-politikasi` },
                 { label: "Kullanım Koşulları", href: `${base}/pages/kullanim-kosullari` },
                 { label: "İade & İptal Şartları", href: `${base}/pages/iade-sartlari` },
                 { label: "Mesafeli Satış Sözleşmesi", href: `${base}/pages/mesafeli-satis` },
-            ],
+            ]),
         },
     ]
 
     const socials = [
-        { icon: IgIcon, href: "#", label: "Instagram" },
-        { icon: FbIcon, href: "#", label: "Facebook" },
-        { icon: XIcon, href: "#", label: "X" },
-        { icon: YtIcon, href: "#", label: "YouTube" },
-    ]
+        { icon: IgIcon, href: sf.socials?.instagram || "#", label: "Instagram" },
+        { icon: FbIcon, href: sf.socials?.facebook || "#", label: "Facebook" },
+        { icon: XIcon, href: sf.socials?.x || "#", label: "X" },
+        { icon: YtIcon, href: sf.socials?.youtube || "#", label: "YouTube" },
+    ].filter(s => s.href && s.href !== "#")
+
+    // İletişim bilgileri fallback
+    const contactPerson = sf.contact?.person || "Mustafa Gürcüler"
+    const contactPhone = sf.contact?.phone || "0507 561 31 34"
+    const contactEmail = sf.contact?.email || "destek@aquahavuz.com"
+    const contactAddress = sf.contact?.address || "Kuşadası / Merkez"
+    const brandName = tenant?.name || "Aqua Havuz"
 
     return (
         <footer className="relative mt-24 text-white">
@@ -195,34 +213,45 @@ export default function Footer({ countryCode }: { countryCode: string }) {
                         <div className="col-span-2">
                             <h4 className="font-semibold mb-4 text-white/90">İletişim</h4>
                             <ul className="space-y-3 text-sm text-white/60">
+                                {contactPerson && (
                                 <li className="flex items-center gap-3">
                                     <User size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                    <span className="font-medium text-white/80">Mustafa Gürcüler</span>
+                                    <span className="font-medium text-white/80">{contactPerson}</span>
                                 </li>
+                                )}
+                                {contactAddress && (
                                 <li className="flex items-start gap-3">
                                     <MapPin size={18} className="mt-0.5 shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                    <span>Kuşadası / Merkez</span>
+                                    <span>{contactAddress}</span>
                                 </li>
+                                )}
+                                {contactPhone && (
                                 <li>
-                                    <a href="tel:+905075613134" className="flex items-center gap-3 hover:text-white transition-colors">
+                                    <a href={`tel:${contactPhone.replace(/\s+/g, '')}`} className="flex items-center gap-3 hover:text-white transition-colors">
                                         <Phone size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                        0507 561 31 34
+                                        {contactPhone}
                                     </a>
                                 </li>
+                                )}
+                                {contactEmail && (
                                 <li>
-                                    <a href="mailto:destek@aquahavuz.com" className="flex items-center gap-3 hover:text-white transition-colors">
+                                    <a href={`mailto:${contactEmail}`} className="flex items-center gap-3 hover:text-white transition-colors">
                                         <Mail size={18} className="shrink-0" style={{ color: "var(--ag-primary, #36c5e6)" }} />
-                                        destek@aquahavuz.com
+                                        {contactEmail}
                                     </a>
                                 </li>
+                                )}
                             </ul>
                             {/* Sosyal medya */}
+                            {socials.length > 0 && (
                             <div className="flex items-center gap-3 mt-5">
                                 {socials.map((s) => (
                                     <a
                                         key={s.label}
                                         href={s.href}
                                         aria-label={s.label}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className="grid place-items-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
                                         style={{
                                             background: "rgba(255,255,255,0.06)",
@@ -233,13 +262,14 @@ export default function Footer({ countryCode }: { countryCode: string }) {
                                     </a>
                                 ))}
                             </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Alt bar */}
                     <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
                         <p className="text-sm text-white/50">
-                            © {year} Aqua Havuz. Tüm hakları saklıdır.
+                            © {year} {brandName}. Tüm hakları saklıdır.
                         </p>
                         <div className="flex items-center gap-4 text-white/55">
                             <span className="flex items-center gap-1.5 text-xs">

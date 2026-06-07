@@ -112,7 +112,7 @@ export const GET = async (
         )
 
         if (!result.success) {
-            return res.status(500).json({ error: result.message })
+            return res.status(500).json({ error: "İşlem sırasında bir hata oluştu." })
         }
 
         return res.json({

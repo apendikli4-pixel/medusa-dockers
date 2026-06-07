@@ -28,6 +28,6 @@ export const GET = async (
         res.json(stats)
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown error"
-        res.status(500).json({ error: message })
+        res.status(500).json({ error: "İşlem sırasında bir hata oluştu." })
     }
 }

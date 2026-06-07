@@ -17,7 +17,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         console.error("B2B Setup Failed:", error)
         res.status(500).json({
             message: "Failed to setup B2B Tier",
-            error: message
+            error: "İşlem sırasında bir hata oluştu."
         })
     }
 }

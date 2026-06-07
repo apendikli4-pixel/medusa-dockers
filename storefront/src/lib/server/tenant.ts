@@ -32,6 +32,11 @@ export type StoreTenant = {
         email: string | null
         address: string | null
     }
+    storefront?: {
+        contact?: { person?: string, phone?: string, email?: string, address?: string }
+        socials?: { instagram?: string, facebook?: string, x?: string, youtube?: string }
+        links?: { kurumsal?: string, musteri?: string, yasal?: string }
+    }
     features: string[]
 }
 
