@@ -96,8 +96,12 @@ if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ];
     echo "Medusa started with PID $PID. Waiting..."
     wait $PID
     EXIT_CODE=$?
-    echo "Medusa exited with code $EXIT_CODE"
-    sleep 3600
+    # RESILIENCE: Medusa çökerse konteyneri AYAKTA TUTMA — çık ki Docker'ın
+    # 'restart: unless-stopped' politikası konteyneri otomatik yeniden başlatsın.
+    # (Eskiden 'sleep 3600' vardı; medusa çökünce konteyner canlı kalıp hizmet
+    #  vermiyordu → Traefik 502/504 → 1 saat sessiz kesinti. Artık self-healing.)
+    echo "Medusa exited with code $EXIT_CODE — konteyner cikiyor, Docker otomatik restart edecek."
+    exit ${EXIT_CODE:-1}
 elif [ "$MEDUSA_WORKER_MODE" = "worker" ]; then
     echo "Starting role: WORKER"
     ./node_modules/.bin/medusa start
