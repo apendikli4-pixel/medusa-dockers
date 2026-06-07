@@ -217,7 +217,23 @@ export const tenantContextMiddleware = async (
     )
 
     if (!resolveResult.success) {
-        // FAIL-CLOSED: Tenant çözümlenemedi → isteği bloke et
+        // ─── ADMIN PANELİ İSTİSNASI (tenant OPSİYONEL) ───
+        // Medusa Admin dashboard'u (super-admin) tüm mağazaları yönetir ve
+        // /admin/* çağrılarında tenant header'ı GÖNDERMEZ. Bu yüzden /admin
+        // için tenant çözümlenemezse isteği ENGELLEME — tenant'sız devam et.
+        // Tenant-scoped admin işlemleri (Ayna AI araçları vb.) tenant_id'yi
+        // kendileri header/parametre ile sağlar. Veri izolasyonu /store/*
+        // için fail-closed olarak korunur.
+        if (req.path.startsWith("/admin")) {
+            logger.debug(
+                `[TenantContext] /admin path için tenant yok — opsiyonel olarak geçiliyor. Path: ${req.path}`
+            )
+            req.tenant = null
+            req.tenant_id = undefined
+            return next()
+        }
+
+        // FAIL-CLOSED: /store/* ve diğerleri için tenant zorunlu → isteği bloke et
         logger.warn(
             `[TenantContext] FAIL-CLOSED: İstek reddedildi. ` +
             `Path: ${req.path}, Sebep: ${resolveResult.reason}`
