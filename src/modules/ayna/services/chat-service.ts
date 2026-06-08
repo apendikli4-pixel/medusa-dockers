@@ -162,8 +162,13 @@ export default class AynaChatService {
             cacheType = this.detectCacheType(message);
         }
 
-        // Attempt semantic cache retrieval (only for text-only queries)
-        if (!hasImage) {
+        // DÜRÜSTLÜK: ürün/fiyat/stok niyeti olan mesajlarda cache'i TAMAMEN baypas et.
+        // Fiyat/stok değişebilir; cache eski veri verirse müşteriyi yanıltır (dürüstlük ihlali).
+        // Bu tür sorular her zaman taze DB sonucuyla cevaplanır.
+        const isProductQuery = /fiyat|[uü]cret|kac?\s?para|kaca|kactan|kaçtan|stok|mevcut|var\s?m[ıi]|sat[ıi]yor|sipari[şs]|[uü]r[uü]n|lira|\btl\b|indirim|kampanya|fiyatlar/i.test(message || "")
+
+        // Attempt semantic cache retrieval (only for text-only, non-product queries)
+        if (!hasImage && !isProductQuery) {
             try {
                 const cached = await this.semanticCache_.get(message, options.tenantId);
                 if (cached) {
@@ -313,8 +318,9 @@ export default class AynaChatService {
             providerUsed: aiResponse.providerUsed
         })
 
-        // Cache the response if no image and successful
-        if (!hasImage) {
+        // Cache the response if no image, not a product/price query, and successful.
+        // (Ürün/fiyat/stok cevapları cache'lenmez → her zaman taze, dürüst veri.)
+        if (!hasImage && !isProductQuery) {
             try {
                 const tokensUsed = aiResponse.usage?.totalTokens ?? 0;
                 await this.semanticCache_.set(message, finalResponse, {

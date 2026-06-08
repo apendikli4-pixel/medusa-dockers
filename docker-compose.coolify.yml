@@ -26,6 +26,41 @@ services:
     networks:
       - medusa_network
 
+  # ── Otomatik veritabanı yedeği ──
+  # Günde bir kez pg_dump alır (gzip), son 7 yedeği tutar. Yedekler kalıcı
+  # db_backups volume'ünde. Felaket kurtarma için kritik. (İleride dışarı/offsite
+  # kopya eklenebilir.)
+  db-backup:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PG_DB: ${POSTGRES_DB:-medusa-genesis}
+      PG_USER: ${POSTGRES_USER:-medusa_db_user}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[db-backup] aktif — her 24 saatte bir yedek alinacak (son 7 saklanir).";
+        while true; do
+          TS=$$(date +%Y%m%d-%H%M%S);
+          echo "[db-backup] yedek aliniyor: $$TS";
+          if pg_dump -h postgres -U "$$PG_USER" "$$PG_DB" | gzip > "/backups/db-$$TS.sql.gz"; then
+            echo "[db-backup] tamamlandi: db-$$TS.sql.gz";
+          else
+            echo "[db-backup] HATA: yedek alinamadi";
+            rm -f "/backups/db-$$TS.sql.gz";
+          fi;
+          ls -1t /backups/db-*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm -f;
+          sleep 86400;
+        done
+    volumes:
+      - db_backups:/backups
+    networks:
+      - medusa_network
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -229,6 +264,7 @@ volumes:
   meilisearch_data:
   ollama_data:
   uploads_data:
+  db_backups:
 
 networks:
   medusa_network:
