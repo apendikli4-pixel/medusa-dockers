@@ -252,3 +252,21 @@ export async function retrieveCustomerOrder(orderId: string): Promise<StoreOrder
         return null
     }
 }
+
+/**
+ * Müşterinin kayıtlı adreslerini getir.
+ */
+export async function listCustomerAddresses(): Promise<any[]> {
+    const c = await cookies()
+    if (!c.get(CUSTOMER_JWT_COOKIE)?.value) return []
+    try {
+        const sdk = await getAuthedMedusaClient()
+        const { addresses } = await sdk.store.customer.listAddress({
+            limit: 100,
+        })
+        return addresses || []
+    } catch (err) {
+        return []
+    }
+}
+

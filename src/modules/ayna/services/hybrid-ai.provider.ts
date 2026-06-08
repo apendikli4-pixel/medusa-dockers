@@ -85,6 +85,12 @@ export interface AIGenerateOptions {
      * Blog/içerik üretiminde true verilerek kalite artırılabilir (CPU'da daha yavaş).
      */
     think?: boolean
+    /**
+     * Sistem talimatı (guardian/admin prompt). Verilirse /api/chat'e role:"system"
+     * mesajı olarak gönderilir — kullanıcı mesajına gömmek yerine. Reasoning modeller
+     * (qwen3.x) sistem rolüne çok daha iyi uyar (özellikle tool-calling kararında).
+     */
+    systemPrompt?: string
 }
 
 export interface AIStructuredOptions extends AIGenerateOptions {
@@ -189,7 +195,7 @@ export class HybridAIProviderService {
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
-        const { temperature = 0.7, maxTokens = 1000, tools = [], images, think } = options
+        const { temperature = 0.7, maxTokens = 1000, tools = [], images, think, systemPrompt } = options
 
         const modelToUse = (images && images.length > 0) ? this.ollamaVisionModel : this.ollamaModel;
 
@@ -198,9 +204,14 @@ export class HybridAIProviderService {
             message.images = images
         }
 
+        // Sistem talimatını ayrı system mesajı olarak ver (reasoning modeller için kritik).
+        const messages: any[] = systemPrompt
+            ? [{ role: "system", content: systemPrompt }, message]
+            : [message]
+
         const body: any = {
             model: modelToUse,
-            messages: [message],
+            messages,
             stream: false,
             // Düşünen modellerde (qwen3.x) akıl yürütmeyi varsayılan kapat → hızlı cevap.
             think: think === true,

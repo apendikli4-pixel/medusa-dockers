@@ -83,6 +83,31 @@ export default async function RootLayout({
         tenant?.theme?.primaryColor ?? null
     )
     const sectorAttr = (tenant?.sector || "retail").toLowerCase()
+    const organizationSchema = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": tenant?.name || "Ayna Genesis",
+        "url": "https://ayna.141.98.48.155.sslip.io",
+        "logo": "https://ayna.141.98.48.155.sslip.io/logo.png",
+        "description": theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi.",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+90-555-555-5555",
+            "contactType": "customer service"
+        }
+    }
+
+    const websiteSchema = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": tenant?.name || "Ayna Genesis",
+        "url": "https://ayna.141.98.48.155.sslip.io",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://ayna.141.98.48.155.sslip.io/tr/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
     
     return (
         <html
@@ -92,7 +117,14 @@ export default async function RootLayout({
             style={themeStyle}
         >
             <head>
-                {/* SEO Metadata is injected automatically by Next.js App Router */}
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+                />
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+                />
             </head>
             <body className="min-h-full flex flex-col bg-gray-50/50">
                 <main className="flex-grow relative z-10">{children}</main>

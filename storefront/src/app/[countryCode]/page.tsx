@@ -77,15 +77,19 @@ export default async function HomePage({
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
             {!q && (
-                <section className={`relative w-full min-h-[600px] flex items-center justify-center mb-16 rounded-3xl overflow-hidden ${isPremium ? 'premium-shadow' : 'shadow-xl'} animate-fade-in-up`}>
+                <section className={`relative w-full min-h-[600px] flex items-center justify-center mb-16 rounded-3xl overflow-hidden ${isPremium ? 'premium-shadow' : 'shadow-xl'}`}>
                     {/* Background Image */}
                     <div className="absolute inset-0 z-0">
                         <div className={`absolute inset-0 ${isPremium ? 'bg-slate-900/40' : 'bg-blue-900/30'} z-10 mix-blend-multiply`}></div>
                         <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-transparent z-10 opacity-60"></div>
-                        <img 
+                        <Image 
                             src="/images/premium_hero_banner.png" 
                             alt="Premium Hero" 
-                            className="w-full h-full object-cover object-center animate-reveal"
+                            fill
+                            priority
+                            fetchPriority="high"
+                            sizes="(max-width: 768px) 100vw, 100vw"
+                            className="object-cover object-center"
                         />
                     </div>
                     
@@ -135,16 +139,6 @@ export default async function HomePage({
                             <p className="text-gray-500 mb-6">
                                 Farklı anahtar kelimeler deneyebilir veya kategorilere göz atabilirsiniz.
                             </p>
-                            {!q && (
-                                <a 
-                                    href="http://localhost:9000/app/products" 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition-colors shadow-md"
-                                >
-                                    Admin Panelden Ürün Ekle
-                                </a>
-                            )}
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">

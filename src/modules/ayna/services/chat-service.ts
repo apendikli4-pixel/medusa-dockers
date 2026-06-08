@@ -221,11 +221,18 @@ export default class AynaChatService {
         // Create system prompt based on admin status
         const systemPrompt = isAdmin ? ADMIN_SYSTEM_PROMPT : GUARDIAN_SYSTEM_PROMPT
 
-        // Combine system prompt with user message for the AI provider
-        const fullPrompt = `${systemPrompt}\n\nTenant Context:\n${tenantContext}\n\nUser message: ${message}`
+        // Kullanıcı mesajı (sistem talimatı ayrı system rolünde gider — reasoning modeller için).
+        const userPrompt = `Tenant Context:\n${tenantContext}\n\nUser message: ${message}`
+        // Follow-up (/api/generate tek string) için sistem + kullanıcı birleşik.
+        const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
+
+        // İlk çağrı: sistem rolü + araçlar + düşünme AÇIK (qwen3.x'in tool kararı için).
+        // OLLAMA_CHAT_THINK=false ile (hız için) kapatılabilir.
+        genOptions.systemPrompt = systemPrompt
+        genOptions.think = process.env.OLLAMA_CHAT_THINK !== "false"
 
         // Generate response using hybrid AI provider
-        let aiResponse = await this.hybridAIProvider_.generateText(fullPrompt, genOptions)
+        let aiResponse = await this.hybridAIProvider_.generateText(userPrompt, genOptions)
         let finalResponse = aiResponse.text || ""
         let toolUsed = false
 
@@ -264,8 +271,9 @@ export default class AynaChatService {
             const followUpPrompt = `${fullPrompt}\n\n[SYSTEM (INTERNAL): You called one or more tools. Here are the JSON results of those tool calls: ${JSON.stringify(toolResponses)}.\nNow, provide your final natural language response to the user based on these results. Yanıtı Türkçe ver. Yalnızca araç sonuçlarındaki gerçek verilere dayan; veri yoksa dürüstçe bilgi olmadığını söyle.]`
 
             // Follow-up çağrısında araçları kapat — model sonucu yorumlayıp
-            // düz metin cevap üretsin, tekrar tool çağırmasın.
-            const followUpOptions = { ...genOptions, tools: undefined }
+            // düz metin cevap üretsin, tekrar tool çağırmasın. Düşünme KAPALI (hız) +
+            // sistem talimatı zaten fullPrompt içinde olduğundan systemPrompt verilmez.
+            const followUpOptions = { ...genOptions, tools: undefined, think: false, systemPrompt: undefined }
             aiResponse = await this.hybridAIProvider_.generateText(followUpPrompt, followUpOptions)
             finalResponse = aiResponse.text || ""
         }

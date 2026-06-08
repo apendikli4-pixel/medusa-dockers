@@ -49,11 +49,21 @@ export default async function AccountPage({
                     <div className="mt-6 pt-6 border-t border-gray-100">
                         <Link 
                             href={`/${countryCode}/account/wishlist`} 
-                            className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors mb-3"
                         >
                             <div className="flex items-center gap-3">
                                 <span className="text-red-500">❤️</span>
                                 <span className="font-medium text-gray-900">Favorilerim</span>
+                            </div>
+                            <span className="text-gray-400">→</span>
+                        </Link>
+                        <Link 
+                            href={`/${countryCode}/account/addresses`} 
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-blue-500">📍</span>
+                                <span className="font-medium text-gray-900">Adreslerim</span>
                             </div>
                             <span className="text-gray-400">→</span>
                         </Link>
