@@ -1,6 +1,6 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { ga4Service } from "../lib/analytics/ga4-service"
-import { AynaService } from "../modules/ayna/service"
+import AynaService from "../modules/ayna/service"
 
 export default async function seoMissionGeneratorJob(container: MedusaContainer) {
     const logger = container.resolve("logger") as any
@@ -42,11 +42,10 @@ açıklamasının zenginleştirilmesi için bir onay görevi (Mission) oluştur.
 Önemli: result_intent_action alanına 'generate_seo_blog' yazabilirsin.
 `
         // Ayna'yı admin modunda tetikle (Otonom işlem)
+        // İmza: processMessage(message, options)
         await aynaService.processMessage(
-            "system_seo_bot",
-            "admin",
             missionPrompt,
-            { isAdmin: true, sector: "retail" } // Admin yetkisiyle araçları kullanabilsin
+            { isAdmin: true, tenantSector: "retail" } as any // Admin yetkisiyle araçları kullanabilsin
         )
 
         logger.info(`[SEO Mission Job] '${targetPage.pageTitle}' için Ayna AI Mission başarıyla oluşturuldu. Admin onayını bekliyor.`)

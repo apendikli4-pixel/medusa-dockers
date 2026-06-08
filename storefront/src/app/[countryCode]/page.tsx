@@ -84,7 +84,7 @@ export default async function HomePage({
                         <div className={`absolute inset-0 ${isPremium ? 'bg-slate-900/40' : 'bg-blue-900/30'} z-10 mix-blend-multiply`}></div>
                         <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-transparent z-10 opacity-60"></div>
                         <Image 
-                            src="/images/premium_hero_banner.png" 
+                            src="/images/premium_hero_banner.jpg" 
                             alt="Premium Hero" 
                             fill
                             priority
