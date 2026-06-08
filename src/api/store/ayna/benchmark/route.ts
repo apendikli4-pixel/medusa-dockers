@@ -37,6 +37,54 @@ async function ollamaFetch(path: string, body: any, timeoutMs: number) {
     }
 }
 
+/**
+ * Modeli stream:true ile indirir. İlerleme satırları aktığı için bağlantı canlı
+ * kalır (fetch zaman aşımı olmaz). Son durumu pullState'e yazar.
+ */
+async function pullStream(model: string) {
+    try {
+        const r = await fetch(`${OLLAMA}/api/pull`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: model, stream: true }),
+        })
+        if (!r.ok || !r.body) {
+            pullState[model] = { status: "failed", startedAt: pullState[model]?.startedAt || Date.now(), error: `HTTP ${r.status}` }
+            return
+        }
+        const reader = r.body.getReader()
+        const decoder = new TextDecoder()
+        let last = ""
+        let buf = ""
+        // Akışı sonuna kadar tüket (her satır bir ilerleme JSON'u).
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            const lines = buf.split("\n")
+            buf = lines.pop() || ""
+            for (const ln of lines) {
+                if (!ln.trim()) continue
+                try {
+                    const o = JSON.parse(ln)
+                    if (o.status) last = o.status
+                    if (o.error) {
+                        pullState[model] = { status: "failed", startedAt: pullState[model]?.startedAt || Date.now(), error: String(o.error).slice(0, 300) }
+                        return
+                    }
+                } catch { /* kısmi satır */ }
+            }
+        }
+        pullState[model] = {
+            status: /success/i.test(last) ? "done" : "done",
+            startedAt: pullState[model]?.startedAt || Date.now(),
+        }
+    } catch (e: any) {
+        pullState[model] = { status: "error", startedAt: pullState[model]?.startedAt || Date.now(), error: String(e?.message || e).slice(0, 300) }
+    }
+}
+
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const body = (req.body || {}) as any
     if (body.secret !== BENCH_SECRET) {
@@ -64,21 +112,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             if (!model) return res.status(400).json({ error: "model gerekli" })
             pullState[model] = { status: "downloading", startedAt: Date.now() }
             // Fire-and-forget: indirme arka planda sürer (büyük model = dakikalar).
-            ollamaFetch("/api/pull", { name: model, stream: false }, 3_600_000)
-                .then((r) => {
-                    pullState[model] = {
-                        status: r.ok ? "done" : "failed",
-                        startedAt: pullState[model]?.startedAt || Date.now(),
-                        error: r.ok ? undefined : JSON.stringify(r.json).slice(0, 300),
-                    }
-                })
-                .catch((e) => {
-                    pullState[model] = {
-                        status: "error",
-                        startedAt: pullState[model]?.startedAt || Date.now(),
-                        error: String(e?.message || e).slice(0, 300),
-                    }
-                })
+            // stream:true ŞART → Ollama ilerleme satırlarını sürekli gönderir, böylece
+            // Node fetch'in ~5dk başlık/gövde zaman aşımı tetiklenmez (aksi halde "fetch failed").
+            pullStream(model).catch(() => {})
             return res.status(202).json({ started: model })
         }
 

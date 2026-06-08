@@ -3,6 +3,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { getProductByHandle, formatPrice } from "@/lib/server/data"
 import AddToCartButton from "@/components/AddToCartButton"
+import ProductReviews from "@/components/ProductReviews"
 
 import { Metadata } from "next"
 
@@ -135,6 +136,8 @@ export default async function ProductDetailPage({
                     </div>
                 </div>
             </section>
+            
+            <ProductReviews productId={product.id} />
         </main>
     )
 }

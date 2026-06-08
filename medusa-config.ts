@@ -137,6 +137,9 @@ export default defineConfig({
         wishlist: {
             resolve: "./src/modules/wishlist",
         },
+        reviews: {
+            resolve: "./src/modules/reviews",
+        },
         tenant: {
             resolve: "./src/modules/tenant",
         },

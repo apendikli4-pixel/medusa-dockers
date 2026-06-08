@@ -82,6 +82,11 @@ export default defineMiddlewares({
             matcher: "/store/conscience*",
             middlewares: [authenticate("customer", ["bearer", "session"])],
         },
+        {
+            matcher: "/store/reviews",
+            method: ["POST"],
+            middlewares: [authenticate("customer", ["bearer", "session"])],
+        },
         // Store route'ları — müşteri auth opsiyonel (customerId için)
         {
             matcher: "/store/ayna*",
