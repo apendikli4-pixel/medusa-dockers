@@ -51,14 +51,25 @@ export async function retrieveCurrentTenant(): Promise<StoreTenant | null> {
         const hdrs = await headers()
         const tenantSlug = hdrs.get("x-tenant-slug") || "default"
 
-        const res = await fetch(`${BACKEND_URL}/store/tenants/me`, {
-            method: "GET",
-            headers: {
-                "x-publishable-api-key": PUBLISHABLE_KEY,
-                "x-tenant-slug": tenantSlug,
-            },
-            next: { revalidate: 300, tags: [`tenant:${tenantSlug}`] },
-        })
+        // Sabit timeout: backend dahili çağrısı asılırsa (ağ/sıralama sorunu) tüm
+        // sayfaların 504 vermesini engeller — süre dolarsa null dönüp fallback temaya düşeriz.
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 4000)
+
+        let res: Response
+        try {
+            res = await fetch(`${BACKEND_URL}/store/tenants/me`, {
+                method: "GET",
+                headers: {
+                    "x-publishable-api-key": PUBLISHABLE_KEY,
+                    "x-tenant-slug": tenantSlug,
+                },
+                signal: controller.signal,
+                next: { revalidate: 300, tags: [`tenant:${tenantSlug}`] },
+            })
+        } finally {
+            clearTimeout(timer)
+        }
         if (!res.ok) return null
         const json = (await res.json()) as { tenant?: StoreTenant }
         return json?.tenant ?? null
