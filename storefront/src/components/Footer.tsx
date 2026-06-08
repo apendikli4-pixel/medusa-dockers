@@ -62,18 +62,18 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
             title: "Kurumsal",
             links: parseLinks(sf.links?.kurumsal, [
                 { label: "Hakkımızda", href: `${base}/pages/hakkimizda` },
-                { label: "İletişim", href: `${base}/pages/iletisim` },
+                { label: "İletişim", href: `${base}/contact` },
                 { label: "Blog", href: `${base}/blog` },
-                { label: "Sıkça Sorulan Sorular", href: `${base}/pages/sss` },
+                { label: "Sıkça Sorulan Sorular", href: `${base}/faq` },
             ]),
         },
         {
             title: "Müşteri Hizmetleri",
             links: parseLinks(sf.links?.musteri, [
+                { label: "Sipariş Takip & İade", href: `${base}/track` },
                 { label: "Hesabım", href: `${base}/account` },
                 { label: "Siparişlerim", href: `${base}/account/orders` },
                 { label: "Sepetim", href: `${base}/cart` },
-                { label: "Üye Ol", href: `${base}/account/register` },
             ]),
         },
         {

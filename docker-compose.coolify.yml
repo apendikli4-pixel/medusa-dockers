@@ -63,12 +63,13 @@ services:
     image: ollama/ollama:latest
     restart: unless-stopped
     environment:
-      # 32GB RAM koruması: aynı anda RAM'de TEK model tut (7B↔14B birlikte yüklenmez).
-      OLLAMA_MAX_LOADED_MODELS: "1"
-      # Eşzamanlı tek istek → bellek/CPU tepe yükünü sınırla.
+      # 64GB RAM: ana model (qwen3.6 ~20GB) + embed (nomic ~0.3GB) AYNI ANDA bellekte kalsın
+      # → model takası/yeniden yükleme (50-70sn) ortadan kalkar.
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      # Eşzamanlı tek istek → bellek/CPU tepe yükünü sınırla (CPU inference).
       OLLAMA_NUM_PARALLEL: "1"
-      # Boştaki model 5dk sonra bellekten boşalsın (RAM geri verilir).
-      OLLAMA_KEEP_ALIVE: "5m"
+      # Model bellekte kalsın (boşalıp her çağrıda 60sn yeniden yüklenmesin).
+      OLLAMA_KEEP_ALIVE: "-1"
     volumes:
       - ollama_data:/root/.ollama
     expose:
@@ -96,11 +97,9 @@ services:
       - |
         echo "[ollama-init] Ollama sunucusu bekleniyor...";
         until ollama list >/dev/null 2>&1; do sleep 3; done;
-        echo "[ollama-init] qwen2.5:7b (sohbet modeli) indiriliyor...";
-        ollama pull qwen2.5:7b;
-        echo "[ollama-init] qwen2.5:14b (icerik/blog modeli) indiriliyor (~9GB)...";
-        ollama pull qwen2.5:14b;
-        echo "[ollama-init] nomic-embed-text indiriliyor...";
+        echo "[ollama-init] qwen3.6:35b-a3b (tek model: chat+blog+admin tool, MoE 3B aktif) indiriliyor (~20GB)...";
+        ollama pull qwen3.6:35b-a3b;
+        echo "[ollama-init] nomic-embed-text (embedding) indiriliyor...";
         ollama pull nomic-embed-text;
         echo "[ollama-init] Modeller hazir.";
     restart: "no"
@@ -138,8 +137,8 @@ services:
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       OLLAMA_API_URL: ${OLLAMA_API_URL:-http://ollama:11434}
-      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
-      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen3.6:35b-a3b}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3.6:35b-a3b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-290000}
       DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-tnt_default}
@@ -183,8 +182,8 @@ services:
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
       OLLAMA_API_URL: ${OLLAMA_API_URL:-http://ollama:11434}
-      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen2.5:14b}
-      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
+      OLLAMA_MODEL_NAME: ${OLLAMA_MODEL_NAME:-qwen3.6:35b-a3b}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3.6:35b-a3b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       NODE_OPTIONS: --max-old-space-size=4096
     networks:

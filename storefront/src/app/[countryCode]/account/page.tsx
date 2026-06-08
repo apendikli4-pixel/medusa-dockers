@@ -45,6 +45,19 @@ export default async function AccountPage({
                         <dt>Telefon</dt>
                         <dd>{customer.phone || "—"}</dd>
                     </dl>
+                    
+                    <div className="mt-6 pt-6 border-t border-gray-100">
+                        <Link 
+                            href={`/${countryCode}/account/wishlist`} 
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-red-500">❤️</span>
+                                <span className="font-medium text-gray-900">Favorilerim</span>
+                            </div>
+                            <span className="text-gray-400">→</span>
+                        </Link>
+                    </div>
                 </section>
 
                 <section className="ag-account-card">

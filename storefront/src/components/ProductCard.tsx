@@ -3,6 +3,7 @@ import Image from "next/image"
 import type { StoreProduct } from "@/lib/server/data"
 import { formatPrice } from "@/lib/server/data"
 import { ShoppingBag, ArrowRight } from "lucide-react"
+import WishlistButton from "./WishlistButton"
 
 export default function ProductCard({ product, countryCode }: { product: StoreProduct; countryCode: string }) {
     const firstVariant = product.variants?.[0]
@@ -58,6 +59,14 @@ export default function ProductCard({ product, countryCode }: { product: StorePr
                     >
                         Hızlı İncele <ArrowRight size={16} />
                     </span>
+                </div>
+
+                {/* Wishlist Button - Top Right */}
+                <div className="absolute top-4 right-4 z-20">
+                    <WishlistButton 
+                        productId={product.id} 
+                        className="w-10 h-10 bg-white/80 backdrop-blur-md shadow-sm border border-gray-100" 
+                    />
                 </div>
             </div>
 

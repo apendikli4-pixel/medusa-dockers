@@ -3,6 +3,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { getProductByHandle, formatPrice } from "@/lib/server/data"
 import AddToCartButton from "@/components/AddToCartButton"
+import WishlistButton from "@/components/WishlistButton"
 import ProductReviews from "@/components/ProductReviews"
 
 import { Metadata } from "next"
@@ -89,9 +90,15 @@ export default async function ProductDetailPage({
                 
                 {/* Sağ Taraf: Ürün/Villa Bilgileri */}
                 <div className="flex flex-col pt-4 md:pt-8">
-                    <h1 className="text-3xl md:text-4xl font-heading font-bold text-gray-900 mb-4 tracking-tight">
-                        {product.title}
-                    </h1>
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                        <h1 className="text-3xl md:text-4xl font-heading font-bold text-gray-900 tracking-tight">
+                            {product.title}
+                        </h1>
+                        <WishlistButton 
+                            productId={product.id} 
+                            className="w-12 h-12 bg-white rounded-full shadow-sm border border-gray-100 flex-shrink-0 mt-1" 
+                        />
+                    </div>
                     
                     <div className="text-2xl font-semibold text-[var(--ag-primary)] mb-6 pb-6 border-b border-gray-100">
                         {price ? formatPrice(price.calculated_amount, price.currency_code) : "Fiyat yok"}

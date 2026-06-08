@@ -80,11 +80,17 @@ export default class AynaService extends MedusaService({
      */
     async generateBlogContent(
         prompt: string,
-        opts?: { temperature?: number; maxTokens?: number }
+        opts?: { temperature?: number; maxTokens?: number; think?: boolean }
     ): Promise<string> {
+        // Düşünen model (qwen3.6) blog'da: think AÇIK olursa token bütçesini akıl
+        // yürütmeye harcayıp boş içerik dönebilir / CPU'da timeout'a girebilir.
+        // Bu yüzden varsayılan KAPALI; OLLAMA_BLOG_THINK=true ile açılabilir
+        // (o durumda maxTokens'ı yükseltmek gerekir).
+        const think = opts?.think ?? (process.env.OLLAMA_BLOG_THINK === "true")
         const res = await this.hybridAIProvider_.generateText(prompt, {
             temperature: opts?.temperature ?? 0.4,
             maxTokens: opts?.maxTokens ?? 1200,
+            think,
         })
         const text = (res?.text || "").trim()
         if (!text) {

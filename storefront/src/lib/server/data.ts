@@ -163,6 +163,27 @@ export async function getProductByHandle(handle: string): Promise<StoreProduct |
 }
 
 /**
+ * Birden fazla ürünü ID listesine göre getir.
+ */
+export async function getProductsByIds(ids: string[]): Promise<StoreProduct[]> {
+    if (!ids || ids.length === 0) return []
+    const region = await getDefaultRegion()
+    if (!region) return []
+    try {
+        const { products } = await sdk.store.product.list({
+            id: ids,
+            region_id: region.id,
+            limit: ids.length,
+            fields: "id,title,handle,description,thumbnail,*variants,*variants.calculated_price",
+        })
+        return (products as unknown) as StoreProduct[]
+    } catch (err) {
+        console.error("[getProductsByIds]", err)
+        return []
+    }
+}
+
+/**
  * Para birimini sembolize et.
  */
 export function formatPrice(amount: number | undefined, currency: string = "EUR"): string {

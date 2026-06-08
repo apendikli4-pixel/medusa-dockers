@@ -7,7 +7,7 @@ export default function ContactPage() {
     const [loading, setLoading] = useState(false)
     const [status, setStatus] = useState<{ type: "success" | "error" | null, message: string }>({ type: null, message: "" })
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
@@ -123,11 +123,17 @@ export default function ContactPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Konu</label>
-                                        <input 
-                                            type="text" name="subject" value={formData.subject} onChange={handleChange}
-                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Konu *</label>
+                                        <select 
+                                            name="subject" required value={formData.subject} onChange={handleChange}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                                        >
+                                            <option value="" disabled>Lütfen Bir Konu Seçin</option>
+                                            <option value="İstek ve Öneri">İstek ve Öneri</option>
+                                            <option value="Sipariş Sorunu">Sipariş Sorunu</option>
+                                            <option value="Şikayet">Şikayet</option>
+                                            <option value="Genel Bilgi">Genel Bilgi</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div>

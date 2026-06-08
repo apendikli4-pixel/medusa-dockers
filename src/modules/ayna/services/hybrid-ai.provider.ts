@@ -79,6 +79,12 @@ export interface AIGenerateOptions {
     responseFormat?: "text" | "json"
     tools?: any[]
     images?: string[] // Base64 encoded images
+    /**
+     * Düşünen modellerde (qwen3.x) gizli akıl yürütme.
+     * Varsayılan: false → doğrudan/hızlı cevap (chat için ideal).
+     * Blog/içerik üretiminde true verilerek kalite artırılabilir (CPU'da daha yavaş).
+     */
+    think?: boolean
 }
 
 export interface AIStructuredOptions extends AIGenerateOptions {
@@ -100,14 +106,14 @@ export class HybridAIProviderService {
         this.logger = logger
 
         this.ollamaBaseUrl = process.env.OLLAMA_API_URL || "http://host.docker.internal:11434"
-        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen2.5:7b"
+        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen3.6:35b-a3b"
         // Görsel işleme için ayrı bir model kullanılabilir (örneğin llava veya llama3.2-vision)
         this.ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "llava"
         this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
         // Sohbet için ayrı (daha hızlı) model: OLLAMA_CHAT_MODEL. Yoksa ana modele düşer.
         // Sohbet interaktif olduğu için CPU sunucuda 7B tercih edilir; blog/içerik üretimi
         // (ollama-client üzerinden) 14B kalitesinde kalır.
-        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen2.5:7b"
+        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen3.6:35b-a3b"
         // Embedding için ayrı, hafif bir model kullanmak idealdir (nomic-embed-text).
         // Yoksa ana modele düşer.
         this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
@@ -183,7 +189,7 @@ export class HybridAIProviderService {
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
-        const { temperature = 0.7, maxTokens = 1000, tools = [], images } = options
+        const { temperature = 0.7, maxTokens = 1000, tools = [], images, think } = options
 
         const modelToUse = (images && images.length > 0) ? this.ollamaVisionModel : this.ollamaModel;
 
@@ -196,6 +202,8 @@ export class HybridAIProviderService {
             model: modelToUse,
             messages: [message],
             stream: false,
+            // Düşünen modellerde (qwen3.x) akıl yürütmeyi varsayılan kapat → hızlı cevap.
+            think: think === true,
             tools: this.toOllamaTools(tools),
             options: {
                 temperature,
@@ -265,7 +273,7 @@ export class HybridAIProviderService {
         prompt: string,
         options: AIGenerateOptions = {}
     ): Promise<AIProviderResponse> {
-        const { temperature = 0.7, maxTokens = 1000, responseFormat = "text", images } = options
+        const { temperature = 0.7, maxTokens = 1000, responseFormat = "text", images, think } = options
 
         const modelToUse = (images && images.length > 0) ? this.ollamaVisionModel : this.ollamaModel;
 
@@ -273,6 +281,8 @@ export class HybridAIProviderService {
             model: modelToUse,
             prompt,
             stream: false,
+            // Düşünen modellerde (qwen3.x) akıl yürütmeyi varsayılan kapat → hızlı cevap.
+            think: think === true,
             options: {
                 temperature,
                 num_predict: maxTokens,
