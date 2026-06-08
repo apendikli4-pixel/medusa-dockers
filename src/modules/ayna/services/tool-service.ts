@@ -126,6 +126,26 @@ export default class AynaToolService {
         const limit = args.limit || 5
         const q = args.query
 
+        // Sorguyu anlamlı kelimelere ayır (Türkçe sadeleştirme + stopword temizliği).
+        // Böylece "havuzum için klor lazım" gibi cümleler de ürün başlığıyla eşleşir.
+        const STOP = new Set(["için","ile","var","mı","mi","mu","mü","ne","kadar","kaç","kaca","kaçtan","fiyat","fiyatı","fiyati","ucret","ücret","ücreti","stok","stokta","mevcut","acaba","lazım","lazim","istiyorum","almak","alabilir","satıyor","satiyor","misiniz","musunuz","güncel","guncel","nedir","bir","bana","sizde","sizin","urun","ürün","ürünü","tl","lira","adet","kg"])
+        const tokenize = (s: string): string[] => {
+            const map: Record<string, string> = { ç:"c", ğ:"g", ı:"i", ö:"o", ş:"s", ü:"u" }
+            return (s || "")
+                .toLowerCase()
+                .split(/[^a-zçğıöşü0-9]+/i)
+                .map(w => w.split("").map(c => map[c] ?? c).join(""))
+                .filter(w => w.length >= 3 && !STOP.has(w))
+        }
+        const tokens = tokenize(q)
+        const norm = (s: string) => (s || "").toLowerCase().split("").map(c => (({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"} as Record<string,string>)[c] ?? c)).join("")
+        // Bir ürünün sorguyla eşleşme puanı: kaç token başlık/açıklamada geçiyor.
+        const scoreOf = (p: any): number => {
+            if (tokens.length === 0) return 1 // sorgu yoksa hepsi geçerli (genel liste)
+            const hay = norm(`${p?.title || ""} ${p?.description || ""}`)
+            return tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0)
+        }
+
         // Bir ürün listesini fiyatla birlikte sade forma indirger.
         // Fiyat varyantın price_set.prices içinden TRY olanından alınır.
         const simplify = (products: any[]) =>
@@ -157,7 +177,10 @@ export default class AynaToolService {
             // tabanlı izolasyona geçildi). Tek-kiracılı kurulumda global arama doğrudur;
             // çok-kiracılıda sales-channel filtresi ileride eklenebilir.
             if (remoteQuery) {
-                const { data: products } = await (remoteQuery as any).graph({
+                // Yayındaki ürünleri geniş çek (başlık filtresi YOK), sonra kelime-bazlı
+                // JS eşleştirmesiyle ele. Küçük/orta katalogda en güvenilir yol —
+                // "%cümle%" ile başlık eşleşmemesi sorununu (var olanı bulamama) ortadan kaldırır.
+                const { data: allProducts } = await (remoteQuery as any).graph({
                     entity: "product",
                     fields: [
                         "id", "title", "handle", "status", "description",
@@ -166,15 +189,18 @@ export default class AynaToolService {
                         "variants.price_set.prices.amount",
                         "variants.price_set.prices.currency_code",
                     ],
-                    filters: {
-                        ...(q ? { title: { $ilike: `%${q}%` } } : {}),
-                        status: "published",
-                    },
-                    pagination: { take: limit },
+                    filters: { status: "published" },
+                    pagination: { take: 200 },
                 })
-                const simplified = simplify(products)
+                const ranked = (allProducts || [])
+                    .map((p: any) => ({ p, s: scoreOf(p) }))
+                    .filter((x: any) => x.s > 0)
+                    .sort((a: any, b: any) => b.s - a.s)
+                    .slice(0, limit)
+                    .map((x: any) => x.p)
+                const simplified = simplify(ranked)
                 await this.memoryService_.recordTruth("system", "product_search", {
-                    query: q, resultCount: simplified.length, tenantId: tenantId || null,
+                    query: q, tokens, resultCount: simplified.length, tenantId: tenantId || null,
                 })
                 return { products: simplified, count: simplified.length }
             }

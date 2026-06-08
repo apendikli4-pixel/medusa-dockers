@@ -221,15 +221,43 @@ export default class AynaChatService {
         // Create system prompt based on admin status
         const systemPrompt = isAdmin ? ADMIN_SYSTEM_PROMPT : GUARDIAN_SYSTEM_PROMPT
 
+        // ── DÜRÜSTLÜK KATMANI: ürün/fiyat/stok'ta modeli DB'ye ZORLA bağla ──
+        // Müşteri mesajıyla DAİMA gerçek ürün araması yap (kelime eşleşmesi yoksa boş döner,
+        // genel sohbeti etkilemez). Bulunursa "GERÇEK VERİ" olarak enjekte et; model
+        // fiyat/stok'u kafasından değil yalnızca bu veriden söyler. Olmayana "yok", olana "var".
+        let productGrounding = ""
+        if (!isAdmin && !options.image) {
+            try {
+                const search: any = await this.toolService_.handleToolCall(
+                    "search_products",
+                    { query: message, limit: 5 },
+                    {
+                        isAdmin: false,
+                        tenantId: options.tenantId,
+                        remoteQuery: options.remoteQuery,
+                        productModuleService: options.productModuleService,
+                    }
+                )
+                if (search?.products?.length > 0) {
+                    productGrounding = `\n\n[GERÇEK ÜRÜN VERİSİ — veritabanından]\n` +
+                        `Fiyat/stok sorulursa SADECE aşağıdaki listeden cevap ver. Listede olmayan ürün için "şu an katalogda görünmüyor" de; ASLA fiyat/stok uydurma.\n` +
+                        JSON.stringify(search.products)
+                } else {
+                    productGrounding = `\n\n[GERÇEK ÜRÜN VERİSİ] Bu mesajla eşleşen ürün veritabanında bulunamadı. Fiyat/stok soruluyorsa dürüstçe "şu an böyle bir ürün katalogda görünmüyor" de; ASLA uydurma.`
+                }
+            } catch (e: any) {
+                this.logger_.error(`[AynaChat] Ürün grounding hatası: ${e.message}`)
+            }
+        }
+
         // Kullanıcı mesajı (sistem talimatı ayrı system rolünde gider — reasoning modeller için).
-        const userPrompt = `Tenant Context:\n${tenantContext}\n\nUser message: ${message}`
+        const userPrompt = `Tenant Context:\n${tenantContext}\n\nUser message: ${message}${productGrounding}`
         // Follow-up (/api/generate tek string) için sistem + kullanıcı birleşik.
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
 
-        // İlk çağrı: sistem rolü + araçlar + düşünme AÇIK (qwen3.x'in tool kararı için).
-        // OLLAMA_CHAT_THINK=false ile (hız için) kapatılabilir.
+        // Grounding zorunlu olduğu için düşünme VARSAYILAN KAPALI (hız). OLLAMA_CHAT_THINK=true ile açılır.
         genOptions.systemPrompt = systemPrompt
-        genOptions.think = process.env.OLLAMA_CHAT_THINK !== "false"
+        genOptions.think = process.env.OLLAMA_CHAT_THINK === "true"
 
         // Generate response using hybrid AI provider
         let aiResponse = await this.hybridAIProvider_.generateText(userPrompt, genOptions)
