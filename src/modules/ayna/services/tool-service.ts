@@ -195,9 +195,13 @@ export default class AynaToolService {
                         multiTenant = (tall?.length || 0) > 1
                     } catch { /* çözülemezse global davranış */ }
                 }
-                // Güvenlik: tek mağazada filtre UYGULANMAZ (bugünkü davranış korunur).
-                // Sadece ≥2 mağaza + kanal çözüldüyse izolasyon devreye girer.
-                const enforceIsolation = multiTenant && !!tenantScId
+                // Güvenlik: izolasyon VARSAYILAN KAPALI (env ile açılır).
+                // Mevcut kurulumda ürünler her tenant'ın kanalına temiz bağlı olmayabilir;
+                // körlemesine filtrelemek var olan ürünü gizleyip "yok" dedirtir (dürüstlük ihlali).
+                // Vape mağazası kurulurken kanallar+ürün bağları düzgün kurulunca
+                // TENANT_PRODUCT_ISOLATION=true verilip uçtan uca test edilerek açılacak.
+                const isolationEnabled = process.env.TENANT_PRODUCT_ISOLATION === "true"
+                const enforceIsolation = isolationEnabled && multiTenant && !!tenantScId
 
                 // Yayındaki ürünleri geniş çek (başlık filtresi YOK), sonra kelime-bazlı
                 // JS eşleştirmesiyle ele. Küçük/orta katalogda en güvenilir yol.
