@@ -61,7 +61,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
             if (data.status === "published") updateData.published_at = new Date()
         }
 
-        const post = await (content as any).updatePosts(id, updateData)
+        // Medusa V2 generated update metodu ARRAY formu ister: updatePosts([{ id, ...data }]).
+        // (id, data) imzası 500 veriyordu.
+        const updated = await (content as any).updatePosts([{ id, ...updateData }])
+        const post = Array.isArray(updated) ? updated[0] : updated
         return res.json({
             post,
             message: data.status === "published" ? "Yazı yayınlandı" : "Yazı güncellendi",

@@ -163,8 +163,9 @@ export const PATCH = async (
         if (image !== undefined) updateData.image = image
         if (metadata) updateData.metadata = metadata
 
-        // Update post
-        const post = await contentEngineService.updatePosts(id, updateData)
+        // Update post — Medusa V2 generated metot ARRAY formu ister ([{id,...}]).
+        const updated = await contentEngineService.updatePosts([{ id, ...updateData }])
+        const post = Array.isArray(updated) ? updated[0] : updated
 
         return res.json({
             post,

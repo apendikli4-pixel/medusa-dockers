@@ -84,7 +84,8 @@ export interface IContentEngineService {
     listPosts(filters?: ListPostsFilters, options?: ListPostsOptions): Promise<Post[]>
     listAndCountPosts(filters?: ListPostsFilters, options?: ListPostsOptions): Promise<[Post[], number]>
     retrievePost(id: string): Promise<Post | null>
-    updatePosts(id: string, data: UpdatePostInput): Promise<Post>
+    // Medusa V2 generated metot: array formu — updatePosts([{ id, ...data }])
+    updatePosts(data: Array<{ id: string } & Partial<UpdatePostInput>>): Promise<Post[]>
     deletePosts(id: string): Promise<void>
 }
 
