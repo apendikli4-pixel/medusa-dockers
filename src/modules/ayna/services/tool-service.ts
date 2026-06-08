@@ -173,17 +173,39 @@ export default class AynaToolService {
 
         try {
             // Birincil yol: remoteQuery ile ürünleri FİYATLARIYLA çek.
-            // NOT: Doğrudan tenant-product link'i mimaride devre dışı (sales-channel
-            // tabanlı izolasyona geçildi). Tek-kiracılı kurulumda global arama doğrudur;
-            // çok-kiracılıda sales-channel filtresi ileride eklenebilir.
             if (remoteQuery) {
+                // ── ÇOKLU MAĞAZA İZOLASYONU ──
+                // Aktif tenant'ın sales-channel'ını çöz. Çözülürse arama SADECE o
+                // mağazanın ürünlerini döndürür (vape mağazasında havuz ürünü çıkmaz).
+                // Çözülemezse (tek-tenant/default kurulum) tüm ürünler — geriye uyumlu.
+                let tenantScId: string | null = null
+                let multiTenant = false
+                if (tenantId) {
+                    try {
+                        const { data: tdata } = await (remoteQuery as any).graph({
+                            entity: "tenant",
+                            fields: ["sales_channel.id"],
+                            filters: { id: tenantId },
+                        })
+                        tenantScId = tdata?.[0]?.sales_channel?.id || null
+                        // Birden fazla mağaza var mı? (izolasyon yalnızca o zaman gerekir)
+                        const { data: tall } = await (remoteQuery as any).graph({
+                            entity: "tenant", fields: ["id"], pagination: { take: 2 },
+                        })
+                        multiTenant = (tall?.length || 0) > 1
+                    } catch { /* çözülemezse global davranış */ }
+                }
+                // Güvenlik: tek mağazada filtre UYGULANMAZ (bugünkü davranış korunur).
+                // Sadece ≥2 mağaza + kanal çözüldüyse izolasyon devreye girer.
+                const enforceIsolation = multiTenant && !!tenantScId
+
                 // Yayındaki ürünleri geniş çek (başlık filtresi YOK), sonra kelime-bazlı
-                // JS eşleştirmesiyle ele. Küçük/orta katalogda en güvenilir yol —
-                // "%cümle%" ile başlık eşleşmemesi sorununu (var olanı bulamama) ortadan kaldırır.
+                // JS eşleştirmesiyle ele. Küçük/orta katalogda en güvenilir yol.
                 const { data: allProducts } = await (remoteQuery as any).graph({
                     entity: "product",
                     fields: [
                         "id", "title", "handle", "status", "description",
+                        "sales_channels.id",
                         "variants.id", "variants.title",
                         "variants.manage_inventory", "variants.inventory_quantity",
                         "variants.price_set.prices.amount",
@@ -192,7 +214,13 @@ export default class AynaToolService {
                     filters: { status: "published" },
                     pagination: { take: 200 },
                 })
-                const ranked = (allProducts || [])
+                // Sales-channel'a göre kapsamla (çoklu mağaza + kanal çözüldüyse).
+                const scoped = enforceIsolation
+                    ? (allProducts || []).filter((p: any) =>
+                        Array.isArray(p?.sales_channels) &&
+                        p.sales_channels.some((sc: any) => sc?.id === tenantScId))
+                    : (allProducts || [])
+                const ranked = scoped
                     .map((p: any) => ({ p, s: scoreOf(p) }))
                     .filter((x: any) => x.s > 0)
                     .sort((a: any, b: any) => b.s - a.s)
@@ -200,7 +228,8 @@ export default class AynaToolService {
                     .map((x: any) => x.p)
                 const simplified = simplify(ranked)
                 await this.memoryService_.recordTruth("system", "product_search", {
-                    query: q, tokens, resultCount: simplified.length, tenantId: tenantId || null,
+                    query: q, tokens, resultCount: simplified.length,
+                    tenantId: tenantId || null, salesChannelId: tenantScId,
                 })
                 return { products: simplified, count: simplified.length }
             }
