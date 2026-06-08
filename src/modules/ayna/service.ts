@@ -132,6 +132,61 @@ export default class AynaService extends MedusaService({
     }
 
     // Missions metotları MedusaService tarafından otomatik oluşturulur (inherited)
+
+    /**
+     * Generative UI konfigürasyonu üretir.
+     */
+    async generateGenerativeUI(customerId?: string): Promise<any> {
+        let insights: any[] = []
+        if (customerId) {
+            // @ts-ignore - memoryService listMemoryInsights metoduna sahip
+            insights = await this.memoryService_.listMemoryInsights({
+                filters: { entity_id: customerId, is_archived: false },
+                take: 5
+            })
+        }
+
+        const prompt = `Sen e-ticaret sitenin "Generative UI" mimarısısın. Müşterinin site ana sayfasına girdiği anda onun profiline özel UI (Arayüz) elementleri belirleyeceksin.
+Müşteri Bilgisi: ${insights.length > 0 ? insights.map((i: any) => i.content).join("; ") : "Anonim ziyaretçi."}
+
+Görev: Bu müşteri için en uygun Hero banner başlığını, alt başlığını ve hangi ürünleri listelemek gerektiğini (arama terimi olarak) belirle.
+Eğer müşteri anonimse veya spesifik bir verisi yoksa genel geçer, yüksek dönüşümlü (premium) bir ana sayfa kurgusu ver.
+
+Lütfen çıktıyı sadece JSON olarak ver, açıklamalar ekleme.`
+
+        const schema = {
+            type: "object",
+            properties: {
+                heroTitle: { type: "string" },
+                heroTagline: { type: "string" },
+                recommendedSearchQuery: { type: "string" },
+                themeMode: { type: "string", enum: ["light", "dark", "premium"] }
+            },
+            required: ["heroTitle", "heroTagline", "recommendedSearchQuery", "themeMode"]
+        }
+
+        try {
+            const aiResponse = await this.hybridAIProvider_.generateStructured(prompt, { schema })
+            // LLM, JSON'ı Markdown formatında (` ```json ... ``` `) dönebilir
+            let textResponse = aiResponse.text.trim()
+            if (textResponse.startsWith("```json")) {
+                textResponse = textResponse.replace(/```json/g, "").replace(/```/g, "").trim()
+            }
+            if (textResponse.startsWith("```")) {
+                textResponse = textResponse.replace(/```/g, "").trim()
+            }
+            return JSON.parse(textResponse)
+        } catch (error) {
+            this.logger_.error(`[GenerativeUI] Error generating UI: ${error}`)
+            // Fallback default UI
+            return {
+                heroTitle: "Ayna Genesis",
+                heroTagline: "Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı.",
+                recommendedSearchQuery: "",
+                themeMode: "premium"
+            }
+        }
+    }
 }
 
 

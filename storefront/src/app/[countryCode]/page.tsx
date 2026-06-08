@@ -22,6 +22,33 @@ export async function generateMetadata({ searchParams }: any): Promise<Metadata>
     }
 }
 
+import { cookies } from "next/headers"
+
+async function getGenerativeUI() {
+    try {
+        const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
+        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+        const cookieStore = await cookies()
+        
+        const response = await fetch(`${backendUrl}/store/ayna/generative-ui`, {
+            method: "GET",
+            headers: {
+                "x-publishable-api-key": publishableKey,
+                "Cookie": cookieStore.toString()
+            },
+            next: { revalidate: 3600 } // Saatte bir veya session değişince yenilenir
+        })
+        
+        if (response.ok) {
+            return await response.json()
+        }
+    } catch (e) {
+        console.error("[Generative UI] Error fetching UI:", e)
+    }
+    
+    return null
+}
+
 export default async function HomePage({
     params,
     searchParams,
@@ -31,23 +58,29 @@ export default async function HomePage({
 }) {
     const { countryCode } = await params
     const { q } = await searchParams
+    
+    // Generative UI verisini çek (eğer kullanıcı arama yapmamışsa)
+    const genUI = !q ? await getGenerativeUI() : null
+
+    const recommendedQ = genUI?.recommendedSearchQuery || q
+    
     const [products, tenant] = await Promise.all([
-        listProducts({ q, limit: 24 }),
+        listProducts({ q: recommendedQ, limit: 24 }),
         retrieveCurrentTenant(),
     ])
+    
     const theme = getSectorTheme(tenant?.sector)
-    const heroTitle = tenant?.name || "Ayna Genesis"
-    const heroTagline =
-        theme.tagline ||
-        "Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı."
+    const heroTitle = genUI?.heroTitle || tenant?.name || "Ayna Genesis"
+    const heroTagline = genUI?.heroTagline || theme.tagline || "Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı."
+    const isPremium = genUI?.themeMode === "premium" || genUI?.themeMode === "dark"
 
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
             {!q && (
-                <section className="relative w-full min-h-[600px] flex items-center justify-center mb-16 rounded-3xl overflow-hidden premium-shadow animate-fade-in-up">
+                <section className={`relative w-full min-h-[600px] flex items-center justify-center mb-16 rounded-3xl overflow-hidden ${isPremium ? 'premium-shadow' : 'shadow-xl'} animate-fade-in-up`}>
                     {/* Background Image */}
                     <div className="absolute inset-0 z-0">
-                        <div className="absolute inset-0 bg-slate-900/40 z-10 mix-blend-multiply"></div>
+                        <div className={`absolute inset-0 ${isPremium ? 'bg-slate-900/40' : 'bg-blue-900/30'} z-10 mix-blend-multiply`}></div>
                         <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-transparent z-10 opacity-60"></div>
                         <img 
                             src="/images/premium_hero_banner.png" 
@@ -59,7 +92,7 @@ export default async function HomePage({
                     {/* Content */}
                     <div className="relative z-20 flex flex-col items-center text-center px-4 md:px-12 max-w-4xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                         <span className="px-5 py-2 rounded-full glass-panel text-white/90 text-xs font-bold uppercase tracking-[0.2em] mb-8 animate-float">
-                            Yeni Sezon Koleksiyonu
+                            YAPAY ZEKA ÖZEL SEÇİMİ
                         </span>
                         <h1 className="font-heading font-bold text-5xl md:text-7xl lg:text-8xl mb-6 tracking-tight text-white drop-shadow-lg leading-tight">
                             {heroTitle}
@@ -87,7 +120,7 @@ export default async function HomePage({
                 <section className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
                         <h2 className="font-heading font-semibold text-3xl text-gray-900 tracking-tight">
-                            {q ? `"${q}" için sonuçlar (${products.length})` : "Öne Çıkan Ürünler"}
+                            {q ? `"${q}" için sonuçlar (${products.length})` : (genUI?.recommendedSearchQuery ? `Sizin İçin Önerilenler` : "Öne Çıkan Ürünler")}
                         </h2>
                     </div>
 
@@ -97,10 +130,10 @@ export default async function HomePage({
                                 <span className="text-3xl">🔍</span>
                             </div>
                             <h3 className="font-heading font-medium text-xl text-gray-900 mb-2">
-                                {q ? "Aradığınız kriterlere uygun ürün bulunamadı." : "Henüz ürün eklenmemiş."}
+                                {q || genUI?.recommendedSearchQuery ? "Aradığınız kriterlere uygun ürün bulunamadı." : "Henüz ürün eklenmemiş."}
                             </h3>
                             <p className="text-gray-500 mb-6">
-                                Farlı anahtar kelimeler deneyebilir veya kategorilere göz atabilirsiniz.
+                                Farklı anahtar kelimeler deneyebilir veya kategorilere göz atabilirsiniz.
                             </p>
                             {!q && (
                                 <a 
