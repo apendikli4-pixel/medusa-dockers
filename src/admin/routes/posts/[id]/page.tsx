@@ -77,6 +77,34 @@ const EditPostPage = () => {
         }
     }
 
+    // İÇERİĞE görsel ekle: yükle → dönen URL'i <img> olarak içeriğin sonuna ekle.
+    const handleContentImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (!file.type.startsWith("image/")) {
+            toast.error("Lütfen bir görsel dosyası seçin.")
+            return
+        }
+        setUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("files", file)
+            const res = await fetch("/admin/uploads", { method: "POST", body: fd, credentials: "include" })
+            if (!res.ok) throw new Error(`Yükleme başarısız (${res.status})`)
+            const data = await res.json()
+            const url = data?.files?.[0]?.url || data?.uploads?.[0]?.url
+            if (!url) throw new Error("Sunucudan görsel adresi alınamadı")
+            const imgTag = `\n<img src="${url}" alt="" style="max-width:100%;border-radius:12px;margin:16px 0;" />\n`
+            setFormData(prev => ({ ...prev, content: (prev.content || "") + imgTag }))
+            toast.success("Görsel içeriğe eklendi! 🖼️ (İçerik sonuna eklendi, istediğin yere taşıyabilirsin.)")
+        } catch (err: any) {
+            toast.error("Görsel eklenemedi: " + (err?.message || "bilinmeyen hata"))
+        } finally {
+            setUploading(false)
+            e.target.value = ""
+        }
+    }
+
     const handleAIGenerate = async () => {
         if (!formData.title) {
             toast.error("Lütfen önce bir başlık girin!")
@@ -263,8 +291,17 @@ const EditPostPage = () => {
 
                 {/* CONTENT */}
                 <div className="flex flex-col gap-2">
-                    <Label htmlFor="content">İçerik (HTML)</Label>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="content">İçerik (HTML)</Label>
+                        <label className="inline-flex cursor-pointer">
+                            <input type="file" accept="image/*" className="hidden" onChange={handleContentImageUpload} disabled={uploading} />
+                            <Button type="button" variant="secondary" size="small" isLoading={uploading} asChild>
+                                <span>🖼️ İçeriğe Görsel Ekle</span>
+                            </Button>
+                        </label>
+                    </div>
                     <Textarea id="content" name="content" rows={15} value={formData.content} onChange={handleChange} required className="font-mono text-sm" />
+                    <span className="text-ui-fg-subtle text-xs">"İçeriğe Görsel Ekle" yüklediğin görseli içeriğin sonuna ekler; istediğin yere taşıyabilirsin.</span>
                 </div>
 
                 {/* METADATA */}
