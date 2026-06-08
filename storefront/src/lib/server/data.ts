@@ -17,6 +17,7 @@ export type StoreProduct = {
     variants: Array<{
         id: string
         title: string
+        sku?: string | null
         calculated_price?: {
             calculated_amount: number
             currency_code: string

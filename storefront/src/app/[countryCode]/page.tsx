@@ -4,6 +4,7 @@ import { getSectorTheme } from "@/lib/themes"
 import ProductCard from "@/components/ProductCard"
 import CategorySidebar from "@/components/CategorySidebar"
 import { Metadata } from "next"
+import Image from "next/image"
 
 export async function generateMetadata({ searchParams }: any): Promise<Metadata> {
     const tenant = await retrieveCurrentTenant()
