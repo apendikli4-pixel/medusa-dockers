@@ -140,6 +140,15 @@ export default defineConfig({
         reviews: {
             resolve: "./src/modules/reviews",
         },
+        contact: {
+            resolve: "./src/modules/contact",
+        },
+        faq: {
+            resolve: "./src/modules/faq",
+        },
+        rma: {
+            resolve: "./src/modules/rma",
+        },
         tenant: {
             resolve: "./src/modules/tenant",
         },

@@ -122,12 +122,15 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             const model = body.model
             const prompt = body.prompt || "Havuz suyu neden bulanıklaşır? Kısaca, sade ve doğru Türkçe ile açıkla."
             if (!model) return res.status(400).json({ error: "model gerekli" })
-            const r = await ollamaFetch("/api/generate", {
+            const genBody: any = {
                 model,
                 prompt,
                 stream: false,
-                options: { temperature: 0.7, num_predict: body.num_predict || 220 },
-            }, 290_000)
+                // think: düşünen modellerde (qwen3.x) gizli akıl yürütmeyi kapat → hızlı doğrudan cevap.
+                think: body.think === true ? true : false,
+                options: { temperature: 0.7, num_predict: body.num_predict || 400 },
+            }
+            const r = await ollamaFetch("/api/generate", genBody, 290_000)
             const j = r.json || {}
             const evalCount = j.eval_count || 0
             const evalDur = j.eval_duration || 0 // ns
@@ -139,7 +142,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
                 eval_count: evalCount,
                 total_sec: j.total_duration ? +(j.total_duration / 1e9).toFixed(2) : null,
                 load_sec: j.load_duration ? +(j.load_duration / 1e9).toFixed(2) : null,
-                response: (j.response || j.raw || "").slice(0, 1200),
+                thinking: (j.thinking || "").slice(0, 300),
+                response: (j.response || j.raw || "").slice(0, 1500),
             })
         }
 
@@ -150,6 +154,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             const r = await ollamaFetch("/api/chat", {
                 model,
                 stream: false,
+                think: body.think === true ? true : false,
                 messages: [
                     { role: "user", content: "Klor tableti ürününün fiyatını ve stok durumunu öğren." },
                 ],
