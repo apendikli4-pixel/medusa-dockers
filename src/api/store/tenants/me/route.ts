@@ -68,6 +68,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
                 contact: storefront.contact ?? null,
                 socials: storefront.socials ?? null,
                 links: storefront.links ?? null,
+                heroImage: storefront.heroImage ?? null,
             },
             features: Array.isArray(full?.features) ? (full!.features as string[]) : [],
         },

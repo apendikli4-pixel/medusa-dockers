@@ -24,6 +24,10 @@ const StorefrontSettingsPage = () => {
     const [musteriLinks, setMusteriLinks] = useState("")
     const [yasalLinks, setYasalLinks] = useState("")
 
+    // Anasayfa hero (üst banner) görseli
+    const [heroImage, setHeroImage] = useState("")
+    const [uploading, setUploading] = useState(false)
+
     useEffect(() => {
         const fetchTenants = async () => {
             try {
@@ -63,8 +67,31 @@ const StorefrontSettingsPage = () => {
             setKurumsalLinks(sf.links?.kurumsal || "")
             setMusteriLinks(sf.links?.musteri || "")
             setYasalLinks(sf.links?.yasal || "")
+            setHeroImage(sf.heroImage || "")
         }
     }, [selectedTenantId, tenants])
+
+    // Hero görselini sisteme yükle → /admin/uploads → dönen URL'i kaydet.
+    const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setUploading(true)
+        try {
+            const fd = new FormData()
+            fd.append("files", file)
+            const res = await fetch("/admin/uploads", { method: "POST", body: fd, credentials: "include" })
+            if (!res.ok) throw new Error()
+            const data = await res.json()
+            const url = data?.files?.[0]?.url || data?.uploads?.[0]?.url
+            if (!url) throw new Error()
+            setHeroImage(url)
+            toast.success("Görsel yüklendi. Kaydetmeyi unutmayın.")
+        } catch {
+            toast.error("Görsel yüklenemedi")
+        } finally {
+            setUploading(false)
+        }
+    }
 
     const handleSave = async () => {
         if (!selectedTenantId) return
@@ -92,7 +119,8 @@ const StorefrontSettingsPage = () => {
                     kurumsal: kurumsalLinks,
                     musteri: musteriLinks,
                     yasal: yasalLinks,
-                }
+                },
+                heroImage,
             }
         }
 
@@ -146,6 +174,30 @@ const StorefrontSettingsPage = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Anasayfa Hero Görseli */}
+                        <div className="flex flex-col gap-4 p-4 border rounded-lg md:col-span-2">
+                            <Heading level="h2" className="text-base">Anasayfa Hero Görseli (Üst Banner)</Heading>
+                            <Text className="text-ui-fg-muted text-sm">Görseli yükleyin veya URL yapıştırın. Geniş (örn. 1920×1080) görseller en iyi sonucu verir. Boş bırakılırsa varsayılan görsel kullanılır.</Text>
+                            {heroImage && (
+                                <img src={heroImage} alt="Hero önizleme" className="w-full max-h-56 object-cover rounded-lg border" />
+                            )}
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label className="inline-flex">
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleHeroUpload} disabled={uploading} />
+                                    <Button variant="secondary" isLoading={uploading} asChild>
+                                        <span>{uploading ? "Yükleniyor..." : "Görsel Yükle"}</span>
+                                    </Button>
+                                </label>
+                                {heroImage && (
+                                    <Button variant="transparent" onClick={() => setHeroImage("")}>Kaldır</Button>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label>veya Görsel URL'i</Label>
+                                <Input value={heroImage} onChange={e => setHeroImage(e.target.value)} placeholder="https://... veya /images/premium_hero_banner.jpg" />
+                            </div>
+                        </div>
+
                         {/* İletişim */}
                         <div className="flex flex-col gap-4 p-4 border rounded-lg">
                             <Heading level="h2" className="text-base">İletişim Bilgileri</Heading>

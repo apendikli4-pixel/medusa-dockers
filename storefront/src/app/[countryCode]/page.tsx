@@ -74,6 +74,8 @@ export default async function HomePage({
     const heroTitle = genUI?.heroTitle || tenant?.name || "Ayna Genesis"
     const heroTagline = genUI?.heroTagline || theme.tagline || "Dürüstlük odaklı e-ticaret — yapay zeka asistanlı, çok mağazalı."
     const isPremium = genUI?.themeMode === "premium" || genUI?.themeMode === "dark"
+    // Hero görseli: admin Vitrin Ayarları'ndan (tenant) gelir; yoksa varsayılan dosya.
+    const heroImage = tenant?.storefront?.heroImage || "/images/premium_hero_banner.jpg"
 
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -83,14 +85,15 @@ export default async function HomePage({
                     <div className="absolute inset-0 z-0">
                         <div className={`absolute inset-0 ${isPremium ? 'bg-slate-900/40' : 'bg-blue-900/30'} z-10 mix-blend-multiply`}></div>
                         <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-transparent z-10 opacity-60"></div>
-                        <Image 
-                            src="/images/premium_hero_banner.jpg" 
-                            alt="Premium Hero" 
+                        <Image
+                            src={heroImage}
+                            alt="Premium Hero"
                             fill
                             priority
                             fetchPriority="high"
                             sizes="(max-width: 768px) 100vw, 100vw"
                             className="object-cover object-center"
+                            unoptimized={heroImage.startsWith("http")}
                         />
                     </div>
                     
