@@ -23,32 +23,6 @@ export async function generateMetadata({ searchParams }: any): Promise<Metadata>
     }
 }
 
-import { cookies } from "next/headers"
-
-async function getGenerativeUI() {
-    try {
-        const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
-        const cookieStore = await cookies()
-        
-        const response = await fetch(`${backendUrl}/store/ayna/generative-ui`, {
-            method: "GET",
-            headers: {
-                "x-publishable-api-key": publishableKey,
-                "Cookie": cookieStore.toString()
-            },
-            next: { revalidate: 3600 } // Saatte bir veya session değişince yenilenir
-        })
-        
-        if (response.ok) {
-            return await response.json()
-        }
-    } catch (e) {
-        console.error("[Generative UI] Error fetching UI:", e)
-    }
-    
-    return null
-}
 
 export default async function HomePage({
     params,
@@ -60,8 +34,10 @@ export default async function HomePage({
     const { countryCode } = await params
     const { q } = await searchParams
     
-    // Generative UI verisini çek (eğer kullanıcı arama yapmamışsa)
-    const genUI = !q ? await getGenerativeUI() : null
+    // NOT: getGenerativeUI() KALDIRILDI. Her anasayfa yüklemesinde AI'yı (qwen3.6)
+    // senkron tetikliyordu → CPU sunucuda her istek ~100sn %100 CPU → tüm storefront
+    // (statik dahil) 504 oluyordu. Hero zaten tenant/tema fallback'i kullanıyor.
+    const genUI: any = null
 
     const recommendedQ = genUI?.recommendedSearchQuery || q
     
