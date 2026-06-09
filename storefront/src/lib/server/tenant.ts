@@ -22,6 +22,7 @@ export type StoreTenant = {
     slug: string
     name: string
     sector: SectorKey | string
+    publishableKey?: string | null
     theme: {
         primaryColor: string | null
         secondaryColor: string | null

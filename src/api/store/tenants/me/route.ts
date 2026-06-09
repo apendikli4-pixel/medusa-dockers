@@ -48,12 +48,27 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const contact = (settings.contact ?? {}) as Record<string, string>
     const storefront = (settings.storefront ?? {}) as Record<string, any>
 
+    // Tenant'ın kendi publishable key'i — storefront, doğru mağazanın ürünlerini
+    // çekmek için bunu kullanır (çoklu mağaza izolasyonu). Publishable key güvenlidir
+    // (zaten tarayıcıya açıktır), bu yüzden public endpoint'te döndürmek sakıncasız.
+    let publishableKey: string | null = null
+    try {
+        const remoteQuery = req.scope.resolve("remoteQuery") as any
+        const { data } = await remoteQuery.graph({
+            entity: "tenant",
+            fields: ["api_key.token"],
+            filters: { id: ctx.tenant_id },
+        })
+        publishableKey = data?.[0]?.api_key?.token ?? null
+    } catch { /* yoksa null → storefront env key'ine düşer */ }
+
     return res.json({
         tenant: {
             id: ctx.tenant_id,
             slug: ctx.slug,
             name: ctx.name,
             sector: ctx.sector,
+            publishableKey,
             theme: {
                 primaryColor: theme.primaryColor ?? null,
                 secondaryColor: theme.secondaryColor ?? null,

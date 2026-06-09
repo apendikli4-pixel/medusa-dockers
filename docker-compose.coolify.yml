@@ -250,9 +250,11 @@ services:
       MEDUSA_PUBLISHABLE_KEY: ${PUBLISHABLE_API_KEY}
       MEILISEARCH_HOST: http://meilisearch:7700
       MEILISEARCH_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
-      # Coolify magic: storefront'a ana domain ata, Traefik 8000'e yönlendirir
-      # https:// → Let's Encrypt sertifikası (güvenli site, checkout için şart)
-      SERVICE_FQDN_STOREFRONT_8000: https://ayna.141.98.48.155.sslip.io
+      # Coolify magic: storefront'a domain(ler) ata, Traefik 8000'e yönlendirir.
+      # https:// → Let's Encrypt sertifikası. Virgülle birden fazla domain:
+      #   ayna.*  → Aqua Havuz (default tenant)
+      #   vozol.* → Vozol vape mağazası (tenant slug "vozol")
+      SERVICE_FQDN_STOREFRONT_8000: https://ayna.141.98.48.155.sslip.io,https://vozol.141.98.48.155.sslip.io
     expose:
       - "8000"
     networks:
