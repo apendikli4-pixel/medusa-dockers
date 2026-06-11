@@ -2,7 +2,10 @@ import { SchemaType } from "./schema-types"
 
 export const productSearchTool = {
     name: "search_products",
-    description: "Ürün veritabanında arama yapar. Havuz kimyasalları, ekipmanları ve aksesuarları arar.",
+    // Sektör adı GEÇMEZ: bu araç tüm mağazalara yüklenir; açıklamada "havuz" gibi
+    // bir sektör anılırsa model başka sektörün mağazasında kendini o sektörün
+    // uzmanı sanır (Vozol'da havuz uzmanlığı iddiası hatasının köklerinden biri).
+    description: "Bu mağazanın ürün kataloğunda arama yapar (ürün adı, kategori, anahtar kelime).",
     parameters: {
         type: SchemaType.OBJECT,
         properties: {

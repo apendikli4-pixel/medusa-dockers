@@ -154,6 +154,11 @@ export default class AynaChatService {
                 this.logger_.warn(`[AynaChat] Failed to fetch tenant context for ${options.tenantId}`);
             }
         }
+        // Tenant çözülemediyse prompt'a boş satır değil AÇIK işaret git — guardian
+        // prompt bu işarete bakarak sektör uzmanlığı iddiasını kapatır.
+        if (!tenantContext) {
+            tenantContext = "(Mağaza bilgisi bu istekte çözümlenemedi — hiçbir sektörde uzmanlık iddia etme.)"
+        }
 
         // Determine cache type (skip if image query; different modalities not cacheable together)
         let cacheType: CacheType = CacheType.GENERAL;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { deriveTenantSlug } from "@/lib/tenant-slug"
 
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "tr"
 
@@ -16,22 +17,9 @@ export function middleware(request: NextRequest) {
   }
 
   // ─── 1. TENANT ALGILAMA (Subdomain veya Özel Domain) ───
+  // Mantık lib/tenant-slug.ts'te — /api proxy'leri de aynı fonksiyonu kullanır.
   const host = request.headers.get("host") || ""
-  let tenantSlug = "default" // Fallback tenant
-  
-  // Basit Subdomain çözümleme (örn: aqua-test.localhost:8000 -> aqua-test)
-  if (host.includes("localhost") || host.includes("127.0.0.1")) {
-      const parts = host.split(".")
-      if (parts.length >= 2 && parts[0] !== "localhost" && parts[0] !== "127") {
-          tenantSlug = parts[0]
-      }
-  } else {
-      // Prod Domain çözümleme (örn: antalya.aquahavuz.com -> antalya)
-      const parts = host.split(".")
-      if (parts.length >= 3 && parts[0] !== "www") {
-          tenantSlug = parts[0]
-      }
-  }
+  const tenantSlug = deriveTenantSlug(host)
 
   // Header'ları kopyala ve tenant slug'ı enjekte et
   const requestHeaders = new Headers(request.headers)
