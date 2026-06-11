@@ -119,15 +119,27 @@ export async function listProducts(opts: {
 }
 
 /**
- * Tüm kategoriler — sidebar/dropdown için (aktif tenant kapsamı).
+ * Kategoriler — AKTİF tenant'ın ürünlerinden türetilir.
+ * Neden: /store/product-categories sales-channel'a göre filtrelenmez (global), bu yüzden
+ * başka mağazanın kategorisi (ör. havuz sitesinde "Kullan-At Elektronik Sigara") sızardı.
+ * Ürünler publishable key ile zaten kapsamlı olduğundan, ürünlerin kategorilerini toplamak
+ * sızıntıyı tamamen önler (boş kategoriler de gösterilmez — istenen davranış).
  */
 export async function listCategories(): Promise<StoreCategory[]> {
     try {
-        const { product_categories } = await sdk.store.category.list(
-            { fields: "id,name,handle", limit: 50 },
+        const { products } = await sdk.store.product.list(
+            { limit: 200, fields: "id,categories.id,categories.name,categories.handle" },
             await tenantHeaders()
         )
-        return (product_categories as unknown) as StoreCategory[]
+        const map = new Map<string, StoreCategory>()
+        for (const p of ((products as any[]) || [])) {
+            for (const c of (p?.categories || [])) {
+                if (c?.id && !map.has(c.id)) {
+                    map.set(c.id, { id: c.id, name: c.name, handle: c.handle })
+                }
+            }
+        }
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "tr"))
     } catch (err) {
         console.error("[listCategories]", err)
         return []

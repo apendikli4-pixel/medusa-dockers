@@ -41,6 +41,8 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
     // Tenant bilgisini çek (yoksa null döner, fallback kullanırız)
     const tenant = await retrieveCurrentTenant()
     const sf = tenant?.storefront || {}
+    // Sektöre göre içerik (vape mağazasında havuz metinleri görünmemeli)
+    const isVape = tenant?.sector === "vape"
 
     const parseLinks = (str?: string, defaultLinks: {label:string, href:string}[] = []) => {
         if (!str || !str.trim()) return defaultLinks
@@ -77,13 +79,18 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
             ]),
         },
         {
-            title: "Kategoriler", // Kategoriler hala sabit veya eklenebilir
-            links: [
-                { label: "Havuz Kimyasalları", href: `${base}` },
-                { label: "Filtre & Pompa", href: `${base}` },
-                { label: "Temizlik Ekipmanları", href: `${base}` },
-                { label: "Tüm Ürünler", href: `${base}` },
-            ],
+            title: "Kategoriler",
+            links: isVape
+                ? [
+                    { label: "Kullan-At Elektronik Sigara", href: `${base}` },
+                    { label: "Tüm Ürünler", href: `${base}` },
+                ]
+                : [
+                    { label: "Havuz Kimyasalları", href: `${base}` },
+                    { label: "Filtre & Pompa", href: `${base}` },
+                    { label: "Temizlik Ekipmanları", href: `${base}` },
+                    { label: "Tüm Ürünler", href: `${base}` },
+                ],
         },
         {
             title: "Yasal",
@@ -103,12 +110,17 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
         { icon: YtIcon, href: sf.socials?.youtube || "#", label: "YouTube" },
     ].filter(s => s.href && s.href !== "#")
 
-    // İletişim bilgileri fallback
+    // İletişim bilgileri fallback (kişi+telefon ortak; e-posta/adres havuza özel olduğundan
+    // vape mağazasında yalnızca tenant ayarından gelirse gösterilir).
     const contactPerson = sf.contact?.person || "Mustafa Gürcüler"
     const contactPhone = sf.contact?.phone || "0507 561 31 34"
-    const contactEmail = sf.contact?.email || "destek@aquahavuz.com"
-    const contactAddress = sf.contact?.address || "Kuşadası / Merkez"
+    const contactEmail = sf.contact?.email || (isVape ? "" : "destek@aquahavuz.com")
+    const contactAddress = sf.contact?.address || (isVape ? "" : "Kuşadası / Merkez")
     const brandName = tenant?.name || "Aqua Havuz"
+    // Marka açıklaması — sektöre göre
+    const brandDesc = isVape
+        ? "Vozol kullan-at elektronik sigara çeşitleri. Orijinal ürün, güvenli ödeme ve hızlı kargo."
+        : "Havuzunuzun berraklığı için ihtiyacınız olan her şey. Dürüstlük odaklı, yapay zekâ destekli alışveriş deneyimi."
 
     return (
         <footer className="relative mt-24 text-white">
@@ -147,12 +159,11 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
                                     <Waves size={22} className="text-white" />
                                 </span>
                                 <span className="text-2xl font-heading font-bold tracking-tight">
-                                    Aqua Havuz
+                                    {brandName}
                                 </span>
                             </div>
                             <p className="text-white/60 leading-relaxed max-w-md">
-                                Havuzunuzun berraklığı için ihtiyacınız olan her şey.
-                                Dürüstlük odaklı, yapay zekâ destekli alışveriş deneyimi.
+                                {brandDesc}
                             </p>
                         </div>
                         <div className="lg:justify-self-end w-full">
