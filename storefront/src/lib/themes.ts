@@ -24,6 +24,19 @@ export interface SectorTheme {
     }
     /** Tagline (hero altında gözükür) */
     tagline?: string
+    /**
+     * Sektör METİN preset'leri — StoreConfig'te değer yoksa devreye girer.
+     * Çözümleme: tenant config → bu preset → universal preset → nötr.
+     * Mağazaya özel metin (marka adı vb.) BURAYA yazılmaz; o config'in işidir.
+     */
+    texts?: {
+        /** Footer/meta marka açıklaması */
+        brandDescription?: string
+        /** Vitrin chat karşılaması */
+        aiGreeting?: string
+        /** 18+ yaş kapısı varsayılanı */
+        ageGate?: { enabled: boolean; message?: string }
+    }
 }
 
 export const SECTOR_THEMES: Record<SectorKey, SectorTheme> = {
@@ -45,6 +58,11 @@ export const SECTOR_THEMES: Record<SectorKey, SectorTheme> = {
         },
         brandMark: { background: "#2563eb", color: "#ffffff" },
         tagline: "Aradığınız her şey burada.",
+        texts: {
+            brandDescription: "Aradığınız ürünler, dürüst fiyatlar ve güvenli alışveriş.",
+            aiGreeting: "Merhaba! Ben Ayna. Ürünlerimiz veya siparişleriniz hakkında size nasıl yardımcı olabilirim?",
+            ageGate: { enabled: false },
+        },
     },
     villa: {
         label: "Villa & Tatil Kiralama",
@@ -102,6 +120,11 @@ export const SECTOR_THEMES: Record<SectorKey, SectorTheme> = {
         },
         brandMark: { background: "#0369a1", color: "#ffffff" },
         tagline: "Havuzunuz için en iyisi.",
+        texts: {
+            brandDescription: "Havuzunuzun berraklığı için ihtiyacınız olan her şey. Dürüstlük odaklı, yapay zekâ destekli alışveriş deneyimi.",
+            aiGreeting: "Merhaba! Ben Ayna. Havuz malzemeleri, bakım tavsiyeleri veya siparişleriniz hakkında size nasıl yardımcı olabilirim?",
+            ageGate: { enabled: false },
+        },
     },
     vape: {
         label: "Vape & Elektronik Sigara",
@@ -121,6 +144,15 @@ export const SECTOR_THEMES: Record<SectorKey, SectorTheme> = {
         },
         brandMark: { background: "#8b5cf6", color: "#ffffff" },
         tagline: "Premium Buhar Deneyimi",
+        texts: {
+            brandDescription: "Kullan-at elektronik sigara çeşitleri. Orijinal ürün, güvenli ödeme ve hızlı kargo.",
+            aiGreeting: "Merhaba! Ben Ayna. Ürünlerimiz veya siparişleriniz hakkında size nasıl yardımcı olabilirim?",
+            // Yasal gereklilik: vape sektöründe yaş kapısı varsayılan AÇIK.
+            ageGate: {
+                enabled: true,
+                message: "Bu ürünler nikotin içerir ve yalnızca 18 yaş ve üzeri kişilere yöneliktir.",
+            },
+        },
     },
     electronics: {
         label: "Elektronik & Teknoloji",
@@ -207,6 +239,15 @@ export const SECTOR_THEMES: Record<SectorKey, SectorTheme> = {
 export function getSectorTheme(sector: string | null | undefined): SectorTheme {
     const key = (sector || "universal").toLowerCase() as SectorKey
     return SECTOR_THEMES[key] ?? SECTOR_THEMES.universal
+}
+
+/**
+ * Sektör METİN preset'lerini getirir; sektörde tanımsız alanlar universal'a düşer.
+ * Kullanım sırası: tenant config → getSectorTexts(sector) → nötr sabit.
+ */
+export function getSectorTexts(sector: string | null | undefined): NonNullable<SectorTheme["texts"]> {
+    const theme = getSectorTheme(sector)
+    return { ...SECTOR_THEMES.universal.texts, ...theme.texts }
 }
 
 /**

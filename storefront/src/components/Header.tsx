@@ -14,7 +14,7 @@ export default async function Header({ countryCode }: { countryCode: string }) {
     ])
     const count = cart?.items?.reduce((acc, it) => acc + it.quantity, 0) || 0
     const theme = getSectorTheme(tenant?.sector)
-    const brandName = tenant?.name || "Ayna Genesis"
+    const brandName = tenant?.name || "Mağaza"
     const brandLetter = (tenant?.name?.trim()[0] || "A").toUpperCase()
 
     return (

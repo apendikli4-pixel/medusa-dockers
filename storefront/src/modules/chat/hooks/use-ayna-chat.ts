@@ -7,12 +7,18 @@ export type Message = {
     timestamp: Date
 }
 
-export function useAynaChat() {
+/** Mağaza config'i yüklenemezse kullanılacak nötr karşılama (sektör/mağaza adı içermez). */
+const NEUTRAL_GREETING = "Merhaba! Ben Ayna. Size nasıl yardımcı olabilirim?"
+
+export function useAynaChat(greeting?: string) {
+    // Karşılama mesajı MAĞAZA CONFIG'İNDEN gelir (layout → ChatWidget → buraya);
+    // hardcode sektör metni yasak (vape mağazasında havuz selamlaması hatasının kökü).
+    const welcome = greeting || NEUTRAL_GREETING
     const [messages, setMessages] = useState<Message[]>([
         {
             id: "welcome",
             role: "assistant",
-            content: "Merhaba! Ben Ayna. Havuz malzemeleri, bakım tavsiyeleri veya siparişleriniz hakkında size nasıl yardımcı olabilirim?",
+            content: welcome,
             timestamp: new Date(),
         },
     ])
@@ -95,10 +101,10 @@ export function useAynaChat() {
         setMessages([{
             id: "welcome",
             role: "assistant",
-            content: "Merhaba! Ben Ayna. Size nasıl yardımcı olabilirim?",
+            content: welcome,
             timestamp: new Date(),
         }])
-    }, [])
+    }, [welcome])
 
     return {
         messages,

@@ -2,7 +2,7 @@ import "./globals.css"
 import type { Metadata, Viewport } from "next"
 import { ReactNode } from "react"
 import { retrieveCurrentTenant } from "@/lib/server/tenant"
-import { getSectorTheme, buildThemeStyle } from "@/lib/themes"
+import { getSectorTheme, getSectorTexts, buildThemeStyle } from "@/lib/themes"
 import { getBaseUrl } from "@/lib/server/base-url"
 import { NEUTRAL_BRAND } from "@/lib/store-config"
 import ChatWidget from "@/modules/chat/components/chat-widget"
@@ -157,7 +157,8 @@ export default async function RootLayout({
             </head>
             <body className="min-h-full flex flex-col bg-gray-50/50">
                 <main className="flex-grow relative z-10">{children}</main>
-                <ChatWidget />
+                {/* Chat karşılaması: mağaza config'i → sektör preset'i → nötr (hook içinde). */}
+                <ChatWidget greeting={tenant?.storefront?.ai?.greeting || getSectorTexts(tenant?.sector).aiGreeting} />
             </body>
         </html>
     )

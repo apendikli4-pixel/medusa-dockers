@@ -30,19 +30,23 @@ const YtIcon = (p: { className?: string }) => (
 )
 
 import { retrieveCurrentTenant } from "../lib/server/tenant"
+import { listCategories } from "../lib/server/data"
+import { getSectorTexts } from "../lib/themes"
+import { NEUTRAL_BRAND } from "../lib/store-config"
 
 /**
- * Aqua Havuz / Dinamik Tenant Footer'ı
+ * Dinamik Tenant Footer'ı — tüm mağazaya-özel değerler StoreConfig'ten.
+ * Çözümleme: tenant config → sektör metin preset'i → nötr varsayılan.
+ * Sektör koşulu (isVape vb.) YASAK; sektör yalnızca preset seçer.
  */
 export default async function Footer({ countryCode }: { countryCode: string }) {
     const base = `/${countryCode}`
     const year = new Date().getFullYear()
 
-    // Tenant bilgisini çek (yoksa null döner, fallback kullanırız)
+    // Tenant bilgisini çek (yoksa null döner, nötr varsayılanlar kullanılır)
     const tenant = await retrieveCurrentTenant()
     const sf = tenant?.storefront || {}
-    // Sektöre göre içerik (vape mağazasında havuz metinleri görünmemeli)
-    const isVape = tenant?.sector === "vape"
+    const texts = getSectorTexts(tenant?.sector)
 
     const parseLinks = (str?: string, defaultLinks: {label:string, href:string}[] = []) => {
         if (!str || !str.trim()) return defaultLinks
@@ -80,15 +84,15 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
         },
         {
             title: "Kategoriler",
-            links: isVape
-                ? [
-                    { label: "Kullan-At Elektronik Sigara", href: `${base}` },
-                    { label: "Tüm Ürünler", href: `${base}` },
-                ]
+            // Config'te link listesi varsa onu kullan (href base'e göre göreli);
+            // yoksa MAĞAZANIN GERÇEK kategorilerinden türet (tenant-aware) — N mağaza
+            // için sıfır config, sektör hardcode'u yok.
+            links: sf.footer?.categoryLinks?.length
+                ? sf.footer.categoryLinks.map(l => ({ label: l.label, href: `${base}${l.href}` }))
                 : [
-                    { label: "Havuz Kimyasalları", href: `${base}` },
-                    { label: "Filtre & Pompa", href: `${base}` },
-                    { label: "Temizlik Ekipmanları", href: `${base}` },
+                    ...(await listCategories().catch(() => []))
+                        .slice(0, 4)
+                        .map(c => ({ label: c.name, href: `${base}/categories/${c.handle}` })),
                     { label: "Tüm Ürünler", href: `${base}` },
                 ],
         },
@@ -110,17 +114,18 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
         { icon: YtIcon, href: sf.socials?.youtube || "#", label: "YouTube" },
     ].filter(s => s.href && s.href !== "#")
 
-    // İletişim bilgileri fallback (kişi+telefon ortak; e-posta/adres havuza özel olduğundan
-    // vape mağazasında yalnızca tenant ayarından gelirse gösterilir).
-    const contactPerson = sf.contact?.person || "Mustafa Gürcüler"
-    const contactPhone = sf.contact?.phone || "0507 561 31 34"
-    const contactEmail = sf.contact?.email || (isVape ? "" : "destek@aquahavuz.com")
-    const contactAddress = sf.contact?.address || (isVape ? "" : "Kuşadası / Merkez")
-    const brandName = tenant?.name || "Aqua Havuz"
-    // Marka açıklaması — sektöre göre
-    const brandDesc = isVape
-        ? "Vozol kullan-at elektronik sigara çeşitleri. Orijinal ürün, güvenli ödeme ve hızlı kargo."
-        : "Havuzunuzun berraklığı için ihtiyacınız olan her şey. Dürüstlük odaklı, yapay zekâ destekli alışveriş deneyimi."
+    // İletişim bilgileri YALNIZCA mağaza config'inden gelir (boşsa satır gizlenir).
+    // Başka mağazanın değeri fallback olamaz — eski "destek@aquahavuz.com" hatasının kökü buydu.
+    const contactPerson = sf.contact?.person || ""
+    const contactPhone = sf.contact?.phone || ""
+    const contactEmail = sf.contact?.email || ""
+    const contactAddress = sf.contact?.address || ""
+    const brandName = tenant?.name || NEUTRAL_BRAND
+    // Marka açıklaması: config → sektör preset'i → nötr.
+    const brandDesc =
+        sf.branding?.description ||
+        texts.brandDescription ||
+        "Güvenli ve dürüst online alışveriş."
 
     return (
         <footer className="relative mt-24 text-white">

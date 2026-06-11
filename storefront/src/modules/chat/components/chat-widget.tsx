@@ -14,7 +14,7 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
-export default function ChatWidget() {
+export default function ChatWidget({ greeting }: { greeting?: string }) {
     const { 
         messages, 
         isLoading, 
@@ -23,7 +23,7 @@ export default function ChatWidget() {
         sendMessage, 
         clearHistory,
         messagesEndRef 
-    } = useAynaChat()
+    } = useAynaChat(greeting)
     
     const [inputValue, setInputValue] = useState("")
     const [selectedImage, setSelectedImage] = useState<string | null>(null)

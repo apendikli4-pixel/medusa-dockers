@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react"
 
 /**
- * 18+ Yaş Kapısı — yalnızca vape/elektronik sigara mağazasında gösterilir.
+ * 18+ Yaş Kapısı — config-driven: hangi mağazada görüneceği ve metni
+ * StoreConfig (ageGate.enabled / ageGate.message) + sektör preset'inden gelir.
  * Kullanıcı onayı localStorage'da saklanır; onaylanana kadar site içeriği bloke edilir.
- * Yasal/etik gereklilik: nikotin içeren ürünler 18 yaş ve üzeri içindir.
  */
-export default function AgeGate({ brandName = "Mağaza" }: { brandName?: string }) {
+export default function AgeGate({
+    brandName = "Mağaza",
+    message,
+}: {
+    brandName?: string
+    /** Mağazaya özel açıklama (config ageGate.message); yoksa nötr metin. */
+    message?: string
+}) {
     const [decided, setDecided] = useState<boolean>(true) // SSR'da gösterme; client'ta karar ver
     const [rejected, setRejected] = useState(false)
 
@@ -47,10 +54,11 @@ export default function AgeGate({ brandName = "Mağaza" }: { brandName?: string 
                 </div>
                 <h2 className="mb-2 text-2xl font-bold text-white">Yaş Doğrulaması</h2>
                 <p className="mb-1 text-white/70">
-                    <strong className="text-white">{brandName}</strong> elektronik sigara ürünleri satmaktadır.
+                    <strong className="text-white">{brandName}</strong> yalnızca yetişkinlere yönelik ürünler satmaktadır.
                 </p>
                 <p className="mb-6 text-white/70">
-                    Bu ürünler nikotin içerir ve yalnızca <strong className="text-white">18 yaş ve üzeri</strong> kişilere yöneliktir. 18 yaşından büyük müsünüz?
+                    {message || "Bu ürünler yalnızca 18 yaş ve üzeri kişilere yöneliktir."}{" "}
+                    <strong className="text-white">18 yaşından büyük müsünüz?</strong>
                 </p>
 
                 {rejected ? (
@@ -76,7 +84,10 @@ export default function AgeGate({ brandName = "Mağaza" }: { brandName?: string 
                     </div>
                 )}
 
-                <p className="mt-5 text-xs text-white/40">Nikotin bağımlılık yapar. Sağlığa zararlıdır.</p>
+                {/* Yasal dipnot yalnızca nikotin ürünü satan mağazalarda (mesajdan anlaşılır). */}
+                {message?.toLowerCase().includes("nikotin") && (
+                    <p className="mt-5 text-xs text-white/40">Nikotin bağımlılık yapar. Sağlığa zararlıdır.</p>
+                )}
             </div>
         </div>
     )
