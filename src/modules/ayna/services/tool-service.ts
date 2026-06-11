@@ -195,12 +195,13 @@ export default class AynaToolService {
                         multiTenant = (tall?.length || 0) > 1
                     } catch { /* çözülemezse global davranış */ }
                 }
-                // Güvenlik: izolasyon VARSAYILAN KAPALI (env ile açılır).
-                // Mevcut kurulumda ürünler her tenant'ın kanalına temiz bağlı olmayabilir;
-                // körlemesine filtrelemek var olan ürünü gizleyip "yok" dedirtir (dürüstlük ihlali).
-                // Vape mağazası kurulurken kanallar+ürün bağları düzgün kurulunca
-                // TENANT_PRODUCT_ISOLATION=true verilip uçtan uca test edilerek açılacak.
-                const isolationEnabled = process.env.TENANT_PRODUCT_ISOLATION === "true"
+                // İzolasyon VARSAYILAN AÇIK: vitrin/sepet zaten kanal-bazlı izole;
+                // AI araması açık kalırsa Vozol chat'i Aqua ürünü önerir (çapraz sızıntı).
+                // Acil durum kaçışı: TENANT_PRODUCT_ISOLATION=false (kanal bağları
+                // bozulursa ürünler "yok" görünmesin diye kapatma anahtarı korunur).
+                // Ek güvence: multiTenant && tenantScId çözülmüş olmalı — tek mağazada
+                // veya kanal çözülemezse filtre uygulanmaz (fail-open, dürüstlük korunur).
+                const isolationEnabled = process.env.TENANT_PRODUCT_ISOLATION !== "false"
                 const enforceIsolation = isolationEnabled && multiTenant && !!tenantScId
 
                 // Yayındaki ürünleri geniş çek (başlık filtresi YOK), sonra kelime-bazlı
