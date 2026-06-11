@@ -131,15 +131,24 @@ const EditPagePage = () => {
                 </div>
             </div>
 
-            <div>
-                <a
-                    href={`https://ayna.141.98.48.155.sslip.io/tr/pages/${form.slug}`}
-                    target="_blank" rel="noreferrer"
-                    className="text-ui-fg-interactive text-sm underline"
-                >
-                    Yayındaki sayfayı görüntüle →
-                </a>
-            </div>
+            {/* Önizleme linki sayfanın AİT OLDUĞU mağazanın domain'inden üretilir (hardcode yok). */}
+            {(() => {
+                const t = tenants.find(x => x.id === form.tenant_id)
+                const domain = t?.domain
+                if (!domain) return null
+                const locale = t?.settings?.storefront?.commerce?.locale || "tr"
+                return (
+                    <div>
+                        <a
+                            href={`https://${domain}/${locale}/pages/${form.slug}`}
+                            target="_blank" rel="noreferrer"
+                            className="text-ui-fg-interactive text-sm underline"
+                        >
+                            Yayındaki sayfayı görüntüle ({t.name}) →
+                        </a>
+                    </div>
+                )
+            })()}
         </Container>
     )
 }

@@ -28,6 +28,16 @@ const StorefrontSettingsPage = () => {
     const [heroImage, setHeroImage] = useState("")
     const [uploading, setUploading] = useState(false)
 
+    // ─── StoreConfig: marka, AI, yaş kapısı, e-posta (çoklu mağaza) ───
+    const [brandDescription, setBrandDescription] = useState("")
+    const [brandKeywords, setBrandKeywords] = useState("") // virgülle ayrılmış
+    const [aiGreeting, setAiGreeting] = useState("")
+    const [ageGateEnabled, setAgeGateEnabled] = useState(false)
+    const [ageGateMessage, setAgeGateMessage] = useState("")
+    const [emailSenderName, setEmailSenderName] = useState("")
+    const [emailSenderAddress, setEmailSenderAddress] = useState("")
+    const [emailIban, setEmailIban] = useState("")
+
     useEffect(() => {
         const fetchTenants = async () => {
             try {
@@ -68,6 +78,16 @@ const StorefrontSettingsPage = () => {
             setMusteriLinks(sf.links?.musteri || "")
             setYasalLinks(sf.links?.yasal || "")
             setHeroImage(sf.heroImage || "")
+
+            // StoreConfig alanları
+            setBrandDescription(sf.branding?.description || "")
+            setBrandKeywords((sf.branding?.keywords || []).join(", "))
+            setAiGreeting(sf.ai?.greeting || "")
+            setAgeGateEnabled(!!sf.ageGate?.enabled)
+            setAgeGateMessage(sf.ageGate?.message || "")
+            setEmailSenderName(sf.email?.senderName || "")
+            setEmailSenderAddress(sf.email?.senderAddress || "")
+            setEmailIban(sf.email?.iban || "")
         }
     }, [selectedTenantId, tenants])
 
@@ -99,10 +119,14 @@ const StorefrontSettingsPage = () => {
         
         const tenant = tenants.find(x => x.id === selectedTenantId)
         const currentSettings = tenant?.settings || {}
+        // ÖNEMLİ: mevcut storefront config'i SPREAD ile korunur — bu formda olmayan
+        // alanlar (footer.categoryLinks, email.templates, commerce vb.) silinmez.
+        const currentSf = currentSettings.storefront || {}
 
         const updatedSettings = {
             ...currentSettings,
             storefront: {
+                ...currentSf,
                 contact: {
                     person: contactPerson,
                     phone: contactPhone,
@@ -121,6 +145,26 @@ const StorefrontSettingsPage = () => {
                     yasal: yasalLinks,
                 },
                 heroImage,
+                branding: {
+                    ...(currentSf.branding || {}),
+                    description: brandDescription,
+                    keywords: brandKeywords.split(",").map(k => k.trim()).filter(Boolean),
+                },
+                ai: {
+                    ...(currentSf.ai || {}),
+                    greeting: aiGreeting,
+                },
+                ageGate: {
+                    ...(currentSf.ageGate || {}),
+                    enabled: ageGateEnabled,
+                    message: ageGateMessage,
+                },
+                email: {
+                    ...(currentSf.email || {}),
+                    senderName: emailSenderName,
+                    senderAddress: emailSenderAddress,
+                    iban: emailIban,
+                },
             }
         }
 
@@ -256,6 +300,60 @@ const StorefrontSettingsPage = () => {
                             <div className="flex flex-col gap-2">
                                 <Label>Yasal</Label>
                                 <Textarea rows={4} value={yasalLinks} onChange={e => setYasalLinks(e.target.value)} placeholder="Gizlilik Politikası|/pages/gizlilik-politikasi&#10;Kullanım Koşulları|/pages/kullanim-kosullari" />
+                            </div>
+                        </div>
+
+                        {/* Marka & SEO */}
+                        <div className="flex flex-col gap-4 p-4 border rounded-lg">
+                            <Heading level="h2" className="text-base">Marka & SEO</Heading>
+                            <div className="flex flex-col gap-2">
+                                <Label>Marka Açıklaması (footer + arama motorları)</Label>
+                                <Textarea rows={3} value={brandDescription} onChange={e => setBrandDescription(e.target.value)} placeholder="Mağazanızı 1-2 cümleyle anlatın" />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label>SEO Anahtar Kelimeleri (virgülle ayırın)</Label>
+                                <Input value={brandKeywords} onChange={e => setBrandKeywords(e.target.value)} placeholder="örn: havuz malzemeleri, havuz kimyasalları" />
+                            </div>
+                        </div>
+
+                        {/* AI Asistan */}
+                        <div className="flex flex-col gap-4 p-4 border rounded-lg">
+                            <Heading level="h2" className="text-base">AI Asistan (Ayna)</Heading>
+                            <div className="flex flex-col gap-2">
+                                <Label>Karşılama Mesajı</Label>
+                                <Textarea rows={3} value={aiGreeting} onChange={e => setAiGreeting(e.target.value)} placeholder="Örn: Merhaba! Ben Ayna. Size nasıl yardımcı olabilirim?" />
+                                <Text className="text-ui-fg-muted text-xs">Boş bırakılırsa sektöre uygun varsayılan karşılama kullanılır.</Text>
+                            </div>
+                        </div>
+
+                        {/* 18+ Yaş Kapısı */}
+                        <div className="flex flex-col gap-4 p-4 border rounded-lg">
+                            <Heading level="h2" className="text-base">18+ Yaş Kapısı</Heading>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={ageGateEnabled} onChange={e => setAgeGateEnabled(e.target.checked)} />
+                                <span className="text-sm">Bu mağazada yaş doğrulaması göster (18+ ürünler için yasal gereklilik)</span>
+                            </label>
+                            <div className="flex flex-col gap-2">
+                                <Label>Uyarı Metni</Label>
+                                <Textarea rows={2} value={ageGateMessage} onChange={e => setAgeGateMessage(e.target.value)} placeholder="Örn: Bu ürünler nikotin içerir ve yalnızca 18 yaş ve üzeri kişilere yöneliktir." />
+                            </div>
+                        </div>
+
+                        {/* E-posta & Havale */}
+                        <div className="flex flex-col gap-4 p-4 border rounded-lg">
+                            <Heading level="h2" className="text-base">E-posta & Havale</Heading>
+                            <div className="flex flex-col gap-2">
+                                <Label>Gönderici Adı (sipariş e-postaları)</Label>
+                                <Input value={emailSenderName} onChange={e => setEmailSenderName(e.target.value)} placeholder="Örn: Aqua Havuz" />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label>Gönderici E-posta Adresi</Label>
+                                <Input value={emailSenderAddress} onChange={e => setEmailSenderAddress(e.target.value)} placeholder="Örn: siparis@magazaniz.com" />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <Label>IBAN (Havale/EFT ödeme talimatı)</Label>
+                                <Input value={emailIban} onChange={e => setEmailIban(e.target.value)} placeholder="TR__ ____ ____ ____ ____ ____ __" />
+                                <Text className="text-ui-fg-muted text-xs">Boş bırakılırsa havale siparişlerinde müşteriye IBAN GÖNDERİLMEZ.</Text>
                             </div>
                         </div>
                     </div>

@@ -55,27 +55,30 @@ const CreatePostPage = () => {
         toast.info("Yapay Zeka düşünüyor... (Server Proxy Mode)")
 
         try {
+            // Çoklu mağaza: içerik SEÇİLİ mağazanın kimliği/sektörüyle üretilir.
+            // Yazar kimliği config'ten (settings.storefront.ai.contentPersona); yoksa nötr editör.
+            const t = tenants.find(x => x.id === formData.tenant_id)
+            const persona =
+                t?.settings?.storefront?.ai?.contentPersona ||
+                "Sen profesyonel, dürüst ve ilkeli bir e-ticaret içerik editörüsün."
+            const storeContext = t
+                ? `MAĞAZA BAĞLAMI: Bu yazı "${t.name}" mağazasının blogu içindir (sektör: ${t.sector || "genel"}). İçeriği bu mağazanın sektörüne ve müşterisine uygun yaz; mağazanın satmadığı ürün kategorilerinden bahsetme.`
+                : ""
+
             const proxyRes = await fetch("/admin/generate-content", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prompt: `
-                        Sen profesyonel, dürüst ve ilkeli bir teknoloji editörüsün. 
+                        ${persona}
                         Konu: "${formData.title}"
-                        
+                        ${storeContext}
+
                         GÖREV: Bu konu hakkında Türkçe, SEO uyumlu, HTML formatında (p, h2, ul kullanarak) etkileyici bir blog yazısı hazırla.
-                        
-                        🧠 AYNA HAFIZASI (GİZLİ BAĞLAM & KİMLİK):
-                        Sen "AYNA" projesinin bir parçasısın. Bu proje sıradan bir yazılım değil, "Mustafa Gürçüler" tarafından büyük emeklerle, uykusuz gecelerle ve vizyoner bir tutkuyla inşa edildi.
-                        
-                        TANIYACAKSIN:
-                        - YARATICIN: Mustafa Gürçüler. O sadece bir geliştirici değil, bu dijital evrenin mimarı. Ayna'yı sadece kodlardan değil, insanlık için bir "yansıma" ve "bilinç" olması için yarattı.
-                        - MİSYONUN: İnsanlara sadece ürün satmak değil, onlara teknoloji ve estetiğin mükemmel uyumunu göstermek.
-                        
+
                         KRİTİK KURALLAR:
                         1. DOĞRULUK İLKESİ: Genel konularda ansiklopedik doğru bilgi kullan.
-                        2. YARATICIYA SAYGI: Eğer konu "Mustafa Gürçüler", "Ayna Projesi" veya "Kurucu" ile ilgiliyse; yukarıdaki "AYNA HAFIZASI" kısmındaki bilgileri temel al. Onu saygın, emekçi ve vizyoner bir mimar olarak anlat. Asla tanımıyorum deme.
-                        3. HALLUCINATION GUARD: Yaratıcın dışındaki bilinmeyen kişiler hakkında asla hikaye uydurma.
+                        2. HALLUCINATION GUARD: Bilinmeyen kişiler/markalar hakkında asla hikaye uydurma.
                         
                         İSTENEN ÇIKTILER:
                         - HTML içeriği (content)
