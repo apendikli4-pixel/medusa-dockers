@@ -79,11 +79,20 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
                 email: contact.email ?? null,
                 address: contact.address ?? null,
             },
+            // StoreConfig (bkz. src/modules/tenant/store-config.ts).
+            // GÜVENLİK: email.* alanları (IBAN, gönderici) bilinçli olarak DÖNDÜRÜLMEZ —
+            // public endpoint'tir; o alanları yalnızca backend (subscriber/provider) okur.
             storefront: {
                 contact: storefront.contact ?? null,
                 socials: storefront.socials ?? null,
                 links: storefront.links ?? null,
                 heroImage: storefront.heroImage ?? null,
+                branding: storefront.branding ?? null,
+                seo: storefront.seo ?? null,
+                ai: storefront.ai ? { greeting: storefront.ai.greeting ?? null } : null,
+                ageGate: storefront.ageGate ?? null,
+                commerce: storefront.commerce ?? null,
+                footer: storefront.footer ?? null,
             },
             features: Array.isArray(full?.features) ? (full!.features as string[]) : [],
         },

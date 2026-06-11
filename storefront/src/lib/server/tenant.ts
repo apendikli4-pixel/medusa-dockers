@@ -10,6 +10,7 @@
 import "server-only"
 import { headers } from "next/headers"
 import type { SectorKey } from "../themes"
+import type { StoreConfig } from "../store-config"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
 const PUBLISHABLE_KEY =
@@ -33,12 +34,8 @@ export type StoreTenant = {
         email: string | null
         address: string | null
     }
-    storefront?: {
-        contact?: { person?: string, phone?: string, email?: string, address?: string }
-        socials?: { instagram?: string, facebook?: string, x?: string, youtube?: string }
-        links?: { kurumsal?: string, musteri?: string, yasal?: string }
-        heroImage?: string
-    }
+    /** StoreConfig — mağazaya özel tüm sunum değerleri (bkz. lib/store-config.ts). */
+    storefront?: StoreConfig
     features: string[]
 }
 

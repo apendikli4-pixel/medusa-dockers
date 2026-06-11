@@ -42,6 +42,15 @@ if [ "${RUN_PRODUCTION_SEED}" = "true" ] && { [ "$MEDUSA_WORKER_MODE" = "server"
     timeout 240 ./node_modules/.bin/medusa exec ./src/scripts/seed-production.ts || echo "Seed başarısız/timeout (devam ediliyor; non-fatal)."
 fi
 
+# ─── StoreConfig backfill (idempotent) ───
+# Mağazaya-özel eski hardcode değerleri tenant.settings.storefront'a taşır.
+# Yalnızca EKSİK alanları doldurur; admin'in Vitrin Ayarları'ndan girdiği
+# değerleri asla ezmez. Her deploy'da çalıştırmak güvenlidir.
+if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
+    echo "StoreConfig backfill çalıştırılıyor (idempotent, max 60s)..."
+    timeout 60 ./node_modules/.bin/medusa exec ./src/scripts/backfill-store-config.ts || echo "Backfill başarısız/timeout (devam ediliyor; non-fatal)."
+fi
+
 if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
     echo "Starting role: $MEDUSA_WORKER_MODE"
     if [ "$NODE_ENV" != "production" ]; then
