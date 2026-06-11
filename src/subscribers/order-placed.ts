@@ -1,6 +1,7 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { INotificationModuleService } from "@medusajs/framework/types";
 import { Modules } from "@medusajs/framework/utils";
+import { getStoreConfig } from "../modules/tenant/store-config";
 
 export default async function orderPlacedHandler({
     event: { data },
@@ -9,6 +10,7 @@ export default async function orderPlacedHandler({
     const notificationModuleService: INotificationModuleService = container.resolve(
         Modules.NOTIFICATION
     );
+    const logger: any = container.resolve("logger");
 
     const query: any = container.resolve("remoteQuery");
 
@@ -17,6 +19,7 @@ export default async function orderPlacedHandler({
         fields: [
             "email",
             "display_id",
+            "items.product_id",
             "payment_collections.payments.payment_provider_id"
         ],
         filters: {
@@ -28,23 +31,68 @@ export default async function orderPlacedHandler({
         return;
     }
 
+    // ─── TENANT ÇÖZÜMLEME (bildirimden ÖNCE) ───
+    // Siparişin mağazası = ilk ürünün bağlı olduğu tenant. E-posta göndericisi,
+    // şablon ve IBAN bu mağazanın config'inden okunur (çoklu mağaza).
+    let tenant: any = null;
+    let tenantId: string | null = null;
+    try {
+        const firstProductId = order.items?.[0]?.product_id;
+        if (firstProductId) {
+            const { data: productLinks } = await query({
+                entity: "product",
+                fields: ["tenant.tenant_id"],
+                filters: { id: firstProductId },
+            });
+            tenantId = productLinks?.[0]?.tenant?.tenant_id ?? null;
+            if (tenantId) {
+                const tenantService = container.resolve("tenant") as any;
+                tenant = await tenantService.retrieveTenant(tenantId);
+            }
+        }
+    } catch (e) {
+        // Fail-open: tenant çözümlenemezse global ayarlarla devam edilir.
+        logger.warn(`[order.placed] Tenant çözümlenemedi (order: ${data.id}): ${e instanceof Error ? e.message : e}`);
+    }
+    const storeConfig = getStoreConfig(tenant);
+
     // Check if it's a manual payment (Havale/EFT)
     const isManualPayment = order.payment_collections?.some((pc: any) =>
         pc.payments?.some((p: any) => p.payment_provider_id === "manual")
     );
 
-    const ibanInfo = isManualPayment
-        ? "TR00 0000 0000 0000 0000 0000 00 (Lütfen Sipariş No belirtiniz: " + order.display_id + ")"
-        : null;
+    // IBAN yalnızca mağaza config'inde tanımlıysa gönderilir.
+    // Placeholder IBAN ("TR00...") müşteriye ASLA gitmez — config boşsa talimat yok + uyarı.
+    let ibanInfo: string | null = null;
+    if (isManualPayment) {
+        const iban = storeConfig.email?.iban?.trim();
+        if (iban) {
+            ibanInfo = `${iban} (Lütfen Sipariş No belirtiniz: ${order.display_id})`;
+        } else {
+            logger.warn(
+                `[order.placed] Havale/EFT siparişi (${order.display_id}) ama mağazanın ` +
+                `config'inde IBAN yok (settings.storefront.email.iban) — ödeme talimatı gönderilmedi.`
+            );
+        }
+    }
+
+    // Şablon: mağaza config'i → env → "1".
+    const templateId =
+        storeConfig.email?.templates?.orderPlaced ||
+        process.env.BREVO_ORDER_PLACED_TEMPLATE_ID ||
+        "1";
 
     await notificationModuleService.createNotifications({
         to: order.email,
         channel: "email",
-        template: process.env.BREVO_ORDER_PLACED_TEMPLATE_ID || "1",
+        template: templateId,
         data: {
             order_id: order.display_id,
             is_manual: isManualPayment,
-            payment_instructions: ibanInfo
+            payment_instructions: ibanInfo,
+            store_name: tenant?.name ?? null,
+            // Brevo provider per-tenant göndericiyi buradan okur (settings.storefront.email.*).
+            tenant: tenant ? { settings: tenant.settings ?? {} } : null,
         },
     });
 
@@ -80,36 +128,23 @@ export default async function orderPlacedHandler({
             });
 
             // ─── TENANT BAĞLAMA: Siparişi ürünün ait olduğu mağazaya bağla ───
-            // İlk ürünün tenant bağlantısını bul ve siparişi aynı tenant'a ata
+            // tenantId yukarıda (bildirim için) zaten çözümlendi — yeniden sorgulanmaz.
             try {
-                const firstProductId = fullOrder.items?.[0]?.product_id
-                if (firstProductId) {
-                    // Ürünün bağlı olduğu tenant'ı bul
-                    const { data: productLinks } = await query({
-                        entity: "product",
-                        fields: ["tenant.tenant_id"],
-                        filters: { id: firstProductId },
+                if (tenantId) {
+                    const { linkOrderToTenantWorkflow } = await import(
+                        "../workflows/link-entity-to-tenant.js"
+                    )
+                    await linkOrderToTenantWorkflow(container).run({
+                        input: {
+                            tenant_id: tenantId,
+                            order_id: data.id,
+                        },
                     })
-
-                    const tenantId = productLinks?.[0]?.tenant?.tenant_id
-                    if (tenantId) {
-                        const { linkOrderToTenantWorkflow } = await import(
-                            "../workflows/link-entity-to-tenant.js"
-                        )
-                        await linkOrderToTenantWorkflow(container).run({
-                            input: {
-                                tenant_id: tenantId,
-                                order_id: data.id,
-                            },
-                        })
-                        const logger: any = container.resolve("logger")
-                        logger.info(
-                            `[Order→Tenant] Sipariş ${data.id} → Tenant ${tenantId} otomatik bağlandı.`
-                        )
-                    }
+                    logger.info(
+                        `[Order→Tenant] Sipariş ${data.id} → Tenant ${tenantId} otomatik bağlandı.`
+                    )
                 }
             } catch (tenantError) {
-                const logger: any = container.resolve("logger")
                 logger.warn(
                     `[Order→Tenant] Sipariş tenant bağlama başarısız (order: ${data.id}): ` +
                     `${tenantError instanceof Error ? tenantError.message : "Bilinmeyen"}`

@@ -59,6 +59,7 @@ export const StoreConfigSchema = z.object({
         iban: z.string().optional(),
         templates: z.object({
             orderPlaced: z.string().optional(),
+            orderShipped: z.string().optional(),
         }).optional(),
     }).optional(),
 
