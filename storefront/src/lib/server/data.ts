@@ -14,6 +14,13 @@ import { retrieveCurrentTenant } from "./tenant"
 
 const DEFAULT_REGION_NAME = process.env.NEXT_PUBLIC_DEFAULT_REGION_NAME || "Miror-Core"
 
+// Özel backend endpoint'leri (SDK'da karşılığı olmayanlar) için doğrudan fetch.
+const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
+const FALLBACK_PUBLISHABLE_KEY =
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
+    process.env.MEDUSA_PUBLISHABLE_KEY ||
+    ""
+
 export type StoreProduct = {
     id: string
     title: string
@@ -42,6 +49,11 @@ export type StoreCategory = {
     id: string
     name: string
     handle: string
+}
+
+export type ProductReviewStats = {
+    count: number
+    average: number
 }
 
 /**
@@ -200,6 +212,38 @@ export async function getProductByHandle(handle: string): Promise<StoreProduct |
         return (products?.[0] as unknown as StoreProduct) || null
     } catch (err) {
         console.error("[getProductByHandle]", err)
+        return null
+    }
+}
+
+/**
+ * Onaylı yorumlardan gerçek puan özeti (JSON-LD aggregateRating için).
+ * Yorum yoksa null döner — sahte/yapay değer üretilmez (dürüstlük ilkesi +
+ * Google yapılandırılmış veri politikası: rating yalnızca gerçek veriden gelebilir).
+ * Yorumlar ürüne bağlı (product ID global benzersiz) olduğundan URL-bazlı
+ * fetch cache'i tenant'lar arası sızıntı yaratmaz.
+ */
+export async function getProductReviewStats(productId: string): Promise<ProductReviewStats | null> {
+    if (!productId) return null
+    try {
+        const headers = await tenantHeaders()
+        if (!headers["x-publishable-api-key"] && FALLBACK_PUBLISHABLE_KEY) {
+            headers["x-publishable-api-key"] = FALLBACK_PUBLISHABLE_KEY
+        }
+        const res = await fetch(`${BACKEND_URL}/store/products/${productId}/reviews`, {
+            headers,
+            next: { revalidate: 60 },
+        })
+        if (!res.ok) return null
+        const data = await res.json()
+        const ratings: number[] = (data?.reviews || [])
+            .map((r: { rating?: unknown }) => Number(r?.rating))
+            .filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 5)
+        if (ratings.length === 0) return null
+        const average = ratings.reduce((sum, n) => sum + n, 0) / ratings.length
+        return { count: ratings.length, average }
+    } catch (err) {
+        console.error("[getProductReviewStats]", err)
         return null
     }
 }
