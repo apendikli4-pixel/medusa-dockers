@@ -1,10 +1,14 @@
 /**
  * Cart helpers — server-side. cookie üzerinden cart_id persist edilir.
+ *
+ * ÇOKLU MAĞAZA: TÜM cart çağrıları aktif tenant'ın publishable key'i ile yapılır
+ * (tenantHeaders). Aksi halde sepet global env key'in sales-channel'ına bağlanır
+ * ve başka mağazanın ürünü eklenirken "not in sales channel" hatası oluşur.
  */
 import "server-only"
 import { cookies } from "next/headers"
 import { sdk } from "../medusa-client"
-import { getDefaultRegion } from "./data"
+import { getDefaultRegion, tenantHeaders } from "./data"
 
 const CART_COOKIE = "_medusa_cart_id"
 
@@ -34,12 +38,13 @@ export type StoreCart = {
 export async function getOrCreateCart(): Promise<StoreCart | null> {
     const c = await cookies()
     const cartId = c.get(CART_COOKIE)?.value
+    const headers = await tenantHeaders()
 
     if (cartId) {
         try {
             const { cart } = await sdk.store.cart.retrieve(cartId, {
                 fields: "id,region_id,currency_code,subtotal,total,item_total,items.*,items.product.handle,items.thumbnail",
-            })
+            }, headers)
             if (cart && !cart.completed_at) {
                 return cart as unknown as StoreCart
             }
@@ -52,7 +57,7 @@ export async function getOrCreateCart(): Promise<StoreCart | null> {
     if (!region) return null
 
     try {
-        const { cart } = await sdk.store.cart.create({ region_id: region.id })
+        const { cart } = await sdk.store.cart.create({ region_id: region.id }, {}, headers)
         c.set(CART_COOKIE, cart.id, {
             maxAge: 60 * 60 * 24 * 30,
             path: "/",
@@ -76,7 +81,7 @@ export async function retrieveCart(): Promise<StoreCart | null> {
     try {
         const { cart } = await sdk.store.cart.retrieve(cartId, {
             fields: "id,region_id,currency_code,subtotal,total,item_total,items.*,items.product.handle,items.thumbnail",
-        })
+        }, await tenantHeaders())
         return cart as unknown as StoreCart
     } catch {
         return null

@@ -13,6 +13,8 @@
 import "server-only"
 import { cookies } from "next/headers"
 import { sdk } from "../medusa-client"
+// Çoklu mağaza: checkout çağrıları da aktif tenant'ın publishable key'i ile yapılır.
+import { tenantHeaders } from "./data"
 
 const CART_COOKIE = "_medusa_cart_id"
 
@@ -87,7 +89,7 @@ export async function retrieveCheckoutCart(): Promise<CheckoutCart | null> {
     try {
         const { cart } = await sdk.store.cart.retrieve(cartId, {
             fields: CHECKOUT_FIELDS,
-        })
+        }, await tenantHeaders())
         return cart as unknown as CheckoutCart
     } catch {
         return null
@@ -121,7 +123,7 @@ export async function setCheckoutAddress(input: {
             email: input.email,
             shipping_address: addr,
             billing_address: addr,
-        })
+        }, {}, await tenantHeaders())
         return { ok: true }
     } catch (err: any) {
         return { ok: false, message: err?.message || "Adres kaydedilemedi." }
@@ -138,11 +140,11 @@ export async function listShippingOptions(): Promise<ShippingOption[]> {
         // listCartOptions SDK tip tanımında bulunmayabilir; metod runtime'da mevcut.
         const { shipping_options } = await (
             sdk.store.fulfillment as unknown as {
-                listCartOptions: (q: { cart_id: string }) => Promise<{
+                listCartOptions: (q: { cart_id: string }, headers?: Record<string, string>) => Promise<{
                     shipping_options: any[]
                 }>
             }
-        ).listCartOptions({ cart_id: cartId })
+        ).listCartOptions({ cart_id: cartId }, await tenantHeaders())
 
         return (shipping_options || []).map((o: any) => ({
             id: o.id,
@@ -165,7 +167,7 @@ export async function setShippingMethod(
     const cartId = await getCartId()
     if (!cartId) return { ok: false, message: "Sepet bulunamadı." }
     try {
-        await sdk.store.cart.addShippingMethod(cartId, { option_id: optionId })
+        await sdk.store.cart.addShippingMethod(cartId, { option_id: optionId }, {}, await tenantHeaders())
         return { ok: true }
     } catch (err: any) {
         return { ok: false, message: err?.message || "Kargo seçilemedi." }
@@ -183,7 +185,7 @@ export async function initPaymentSession(
     try {
         await sdk.store.payment.initiatePaymentSession(cart as any, {
             provider_id: providerId,
-        })
+        }, {}, await tenantHeaders())
         return { ok: true }
     } catch (err: any) {
         return { ok: false, message: err?.message || "Ödeme başlatılamadı." }
@@ -199,7 +201,7 @@ export async function completeCheckout(): Promise<
     const cartId = await getCartId()
     if (!cartId) return { ok: false, message: "Sepet bulunamadı." }
     try {
-        const res = await sdk.store.cart.complete(cartId)
+        const res = await sdk.store.cart.complete(cartId, {}, await tenantHeaders())
         if (res.type === "order") {
             const c = await cookies()
             c.delete(CART_COOKIE)

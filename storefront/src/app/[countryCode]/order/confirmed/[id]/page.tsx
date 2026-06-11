@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { getAuthedMedusaClient, sdk } from "@/lib/medusa-client"
 import { formatPrice } from "@/lib/format"
+import { tenantHeaders } from "@/lib/server/data"
 
 /**
  * Sipariş onay sayfası — checkout tamamlandıktan sonra gösterilir.
@@ -21,14 +22,16 @@ export default async function OrderConfirmedPage({
         "items.title,items.quantity,items.unit_price,items.total,items.thumbnail," +
         "shipping_address.*,shipping_methods.name,shipping_methods.amount"
 
+    // Çoklu mağaza: sipariş aktif tenant'ın key'i ile çekilir.
+    const headers = await tenantHeaders()
     let order: any = null
     try {
         const authed = await getAuthedMedusaClient()
-        const res = await authed.store.order.retrieve(id, { fields })
+        const res = await authed.store.order.retrieve(id, { fields }, headers)
         order = res.order
     } catch {
         try {
-            const res = await sdk.store.order.retrieve(id, { fields })
+            const res = await sdk.store.order.retrieve(id, { fields }, headers)
             order = res.order
         } catch {
             order = null

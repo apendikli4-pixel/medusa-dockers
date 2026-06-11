@@ -48,8 +48,11 @@ export type StoreCategory = {
  * Aktif tenant'ın publishable key + slug header'ları.
  * Storefront böylece doğru mağazanın (sales-channel) ürünlerini çeker.
  * Tenant pk yoksa boş döner → SDK kendi env key'ini (default mağaza) kullanır.
+ *
+ * EXPORT: cart.ts / checkout.ts / actions da aynı header'ları kullanmak ZORUNDA —
+ * aksi halde sepet yanlış mağazanın sales-channel'ına bağlanır (çapraz sızıntı).
  */
-async function tenantHeaders(): Promise<Record<string, string>> {
+export async function tenantHeaders(): Promise<Record<string, string>> {
     try {
         const t = await retrieveCurrentTenant()
         const h: Record<string, string> = {}
@@ -62,26 +65,42 @@ async function tenantHeaders(): Promise<Record<string, string>> {
 }
 
 /**
- * Aktif region'u getirir (default: env tabanlı, yoksa ilk region).
- * Region tenant'tan bağımsız (global) olduğundan cache'lenir.
+ * İsme göre region getirir (isim boş/bulunamazsa ilk region).
+ * unstable_cache anahtarına argüman dahildir → her region adı ayrı cache girdisi
+ * (mağazalar birbirinin region'ını ezemez).
  */
-export const getDefaultRegion = unstable_cache(
-    async (): Promise<StoreRegion | null> => {
+const getRegionByName = unstable_cache(
+    async (regionName: string): Promise<StoreRegion | null> => {
         try {
             const { regions } = await sdk.store.region.list({ fields: "id,name,currency_code,countries.iso_2,countries.name" })
             if (!regions?.length) return null
-            const match = regions.find(
-                (r: { name?: string }) => r.name === DEFAULT_REGION_NAME
-            )
+            const match = regionName
+                ? regions.find((r: { name?: string }) => r.name === regionName)
+                : undefined
             return (match || regions[0]) as StoreRegion
         } catch (err) {
-            console.error("[getDefaultRegion]", err)
+            console.error("[getRegionByName]", err)
             return null
         }
     },
-    ["medusa-default-region"],
+    ["medusa-region-by-name"],
     { revalidate: 60, tags: ["regions"] }
 )
+
+/**
+ * AKTİF MAĞAZANIN region'ını getirir.
+ * Çözümleme: tenant config (commerce.regionName) → env varsayılanı → ilk region.
+ * Böylece N mağaza farklı para birimi/region kullanabilir; config'i olmayan
+ * mağaza bugünkü davranışı (env region) korur.
+ */
+export async function getDefaultRegion(): Promise<StoreRegion | null> {
+    let configRegion = ""
+    try {
+        const tenant = await retrieveCurrentTenant()
+        configRegion = tenant?.storefront?.commerce?.regionName || ""
+    } catch { /* tenant çözülemezse env'e düş */ }
+    return getRegionByName(configRegion || DEFAULT_REGION_NAME)
+}
 
 /**
  * Ürün listesi — aktif tenant'ın sales-channel'ına göre kapsamlı.
