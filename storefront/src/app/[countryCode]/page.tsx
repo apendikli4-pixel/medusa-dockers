@@ -17,9 +17,13 @@ export async function generateMetadata({ searchParams }: any): Promise<Metadata>
         }
     }
     
+    // Açıklama mağaza config'inden (branding.description); yoksa sektör tagline'ı.
     return {
         title: "Ana Sayfa",
-        description: "Ayna Genesis yapay zeka destekli otonom e-ticaret platformu.",
+        description:
+            tenant?.storefront?.branding?.description ||
+            getSectorTheme(tenant?.sector).tagline ||
+            "Online alışveriş.",
     }
 }
 

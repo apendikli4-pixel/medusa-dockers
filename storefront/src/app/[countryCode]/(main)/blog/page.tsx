@@ -5,7 +5,7 @@ import { listBlogPosts, formatBlogDate } from "@/lib/server/blog"
 import { ArrowRight, Sparkles } from "lucide-react"
 
 export const metadata: Metadata = {
-    title: "Blog | Ayna Genesis",
+    title: "Blog",
     description: "Uzman içerikler, yapay zeka rehberleri ve sektörel ipuçları.",
 }
 

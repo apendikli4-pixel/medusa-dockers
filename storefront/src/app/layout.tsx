@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from "next"
 import { ReactNode } from "react"
 import { retrieveCurrentTenant } from "@/lib/server/tenant"
 import { getSectorTheme, buildThemeStyle } from "@/lib/themes"
+import { getBaseUrl } from "@/lib/server/base-url"
+import { NEUTRAL_BRAND } from "@/lib/store-config"
 import ChatWidget from "@/modules/chat/components/chat-widget"
 import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google"
 
@@ -38,25 +40,37 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
     const tenant = await retrieveCurrentTenant()
     const theme = getSectorTheme(tenant?.sector)
+    const brandName = tenant?.name || NEUTRAL_BRAND
+    const description =
+        tenant?.storefront?.branding?.description ||
+        theme.tagline ||
+        "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi."
     const title = tenant?.name
-        ? `${tenant.name} — ${theme.tagline ?? "Ayna Genesis"}`
-        : "Ayna Genesis — Yeni Nesil AI Ticaret"
+        ? `${tenant.name} — ${theme.tagline ?? "Online Mağaza"}`
+        : `${NEUTRAL_BRAND} — Online Alışveriş`
+
+    // Anahtar kelimeler mağaza config'inden; yoksa yalnızca nötr + sektör.
+    const keywords = [
+        "e-ticaret",
+        ...(tenant?.storefront?.branding?.keywords || []),
+        tenant?.sector || "",
+    ].filter(Boolean)
 
     return {
         title: {
-            template: `%s | ${tenant?.name || "Ayna Genesis"}`,
+            template: `%s | ${brandName}`,
             default: title,
         },
-        description: theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi.",
-        keywords: ["e-ticaret", "yapay zeka", "otonom ticaret", "Ayna AI", "havuz malzemeleri", tenant?.sector || ""],
+        description,
+        keywords,
         robots: {
             index: true,
             follow: true,
         },
         openGraph: {
             title,
-            description: theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı.",
-            siteName: tenant?.name || "Ayna Genesis",
+            description,
+            siteName: brandName,
             type: "website"
         }
     }
@@ -83,28 +97,43 @@ export default async function RootLayout({
         tenant?.theme?.primaryColor ?? null
     )
     const sectorAttr = (tenant?.sector || "retail").toLowerCase()
+
+    // Çoklu mağaza: URL'ler istek host'undan türetilir (hangi mağaza, o domain).
+    const baseUrl = await getBaseUrl()
+    const brandName = tenant?.name || NEUTRAL_BRAND
+    const brandDescription =
+        tenant?.storefront?.branding?.description ||
+        theme.tagline ||
+        "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi."
+    const contactPhone = tenant?.storefront?.contact?.phone || tenant?.contact?.phone || null
+    const logoUrl = tenant?.storefront?.branding?.logoUrl || `${baseUrl}/logo.png`
+    const locale = tenant?.storefront?.commerce?.locale || "tr"
+
     const organizationSchema = {
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": tenant?.name || "Ayna Genesis",
-        "url": "https://ayna.141.98.48.155.sslip.io",
-        "logo": "https://ayna.141.98.48.155.sslip.io/logo.png",
-        "description": theme.tagline || "Yapay zeka destekli, otonom e-ticaret altyapısı ve akıllı müşteri deneyimi.",
-        "contactPoint": {
-            "@type": "ContactPoint",
-            "telephone": "+90-555-555-5555",
-            "contactType": "customer service"
-        }
+        "name": brandName,
+        "url": baseUrl,
+        "logo": logoUrl,
+        "description": brandDescription,
+        // Telefon yalnızca mağaza config'inde varsa eklenir (sahte numara yasak).
+        ...(contactPhone ? {
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": contactPhone,
+                "contactType": "customer service"
+            }
+        } : {}),
     }
 
     const websiteSchema = {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        "name": tenant?.name || "Ayna Genesis",
-        "url": "https://ayna.141.98.48.155.sslip.io",
+        "name": brandName,
+        "url": baseUrl,
         "potentialAction": {
             "@type": "SearchAction",
-            "target": "https://ayna.141.98.48.155.sslip.io/tr/search?q={search_term_string}",
+            "target": `${baseUrl}/${locale}/search?q={search_term_string}`,
             "query-input": "required name=search_term_string"
         }
     }

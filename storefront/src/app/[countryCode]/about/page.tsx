@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Hakkımızda | Ayna Genesis",
+    title: "Hakkımızda",
     description: "Ayna Genesis'in hikayesi, misyonu, vizyonu ve temel değerleri.",
 }
 

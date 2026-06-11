@@ -1,7 +1,11 @@
 import { MetadataRoute } from 'next'
+import { getBaseUrl } from '@/lib/server/base-url'
 
-export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000'
+// Çoklu mağaza: sitemap adresi istek host'undan türetilir (tek env değil).
+export const dynamic = "force-dynamic"
+
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const baseUrl = await getBaseUrl()
 
   return {
     rules: {

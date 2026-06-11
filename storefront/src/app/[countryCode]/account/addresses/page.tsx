@@ -3,7 +3,7 @@ import { retrieveCustomer, listCustomerAddresses } from "@/lib/server/customer"
 import AddressBook from "@/components/AddressBook"
 
 export const metadata = {
-    title: "Adreslerim - Ayna Genesis",
+    title: "Adreslerim",
     description: "Teslimat ve fatura adreslerinizi yönetin.",
 }
 

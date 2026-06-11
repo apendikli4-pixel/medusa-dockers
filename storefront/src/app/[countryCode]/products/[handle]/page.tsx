@@ -2,6 +2,9 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { getProductByHandle, formatPrice } from "@/lib/server/data"
+import { retrieveCurrentTenant } from "@/lib/server/tenant"
+import { getBaseUrl } from "@/lib/server/base-url"
+import { NEUTRAL_BRAND } from "@/lib/store-config"
 import AddToCartButton from "@/components/AddToCartButton"
 import WishlistButton from "@/components/WishlistButton"
 import ProductReviews from "@/components/ProductReviews"
@@ -21,7 +24,8 @@ export async function generateMetadata({
     }
 
     return {
-        title: `${product.title} | Ayna Genesis`,
+        // Marka eki root layout şablonundan gelir (%s | <mağaza adı>) — hardcode yok.
+        title: product.title,
         description: product.description || `${product.title} satın al.`,
         openGraph: {
             title: product.title,
@@ -43,6 +47,10 @@ export default async function ProductDetailPage({
     const variant = product.variants?.[0]
     const price = variant?.calculated_price
 
+    // Çoklu mağaza: marka + URL aktif mağazadan/host'tan türetilir.
+    const [tenant, baseUrl] = await Promise.all([retrieveCurrentTenant(), getBaseUrl()])
+    const brandName = tenant?.name || NEUTRAL_BRAND
+
     // Generate a pseudo-random high rating for the wow-effect (or fetch real if available)
     // Normally, this would be fetched from `product.metadata` or a reviews module
     const reviewCount = Math.floor(Math.random() * 50) + 10;
@@ -53,12 +61,12 @@ export default async function ProductDetailPage({
         "@type": "Product",
         name: product.title,
         image: product.thumbnail ? [product.thumbnail] : [],
-        description: product.description || "Ayna Genesis Premium Ürün",
+        description: product.description || product.title,
         sku: product.variants?.[0]?.sku || product.id,
         mpn: product.variants?.[0]?.sku || product.id,
         brand: {
             "@type": "Brand",
-            name: "Ayna Genesis"
+            name: brandName
         },
         aggregateRating: {
             "@type": "AggregateRating",
@@ -69,7 +77,7 @@ export default async function ProductDetailPage({
         },
         offers: {
             "@type": "Offer",
-            url: `https://ayna.141.98.48.155.sslip.io/${countryCode}/products/${product.handle}`,
+            url: `${baseUrl}/${countryCode}/products/${product.handle}`,
             price: price?.calculated_amount || 0,
             priceCurrency: price?.currency_code?.toUpperCase() || "TRY",
             availability: "https://schema.org/InStock",
