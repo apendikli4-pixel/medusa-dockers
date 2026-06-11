@@ -37,6 +37,10 @@
 
   html {
     scroll-behavior: smooth;
+    /* Mobil güvenlik ağı: viewport'tan taşan tek bir eleman bile tüm sayfayı
+       yana kaydırır (sağda boşluk). clip — hidden'dan farklı olarak — scroll
+       container yaratmaz, böylece sticky header çalışmaya devam eder. */
+    overflow-x: clip;
   }
 
   body {
@@ -45,6 +49,7 @@
     background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
     background-attachment: fixed;
     min-height: 100vh;
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, h5, h6 {

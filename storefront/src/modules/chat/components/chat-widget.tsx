@@ -70,7 +70,7 @@ export default function ChatWidget({ greeting }: { greeting?: string }) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                        className="mb-4 w-[380px] sm:w-[420px] h-[650px] max-h-[85vh] flex flex-col overflow-hidden rounded-[2rem] border border-white/40 bg-white/60 backdrop-blur-2xl shadow-2xl"
+                        className="mb-4 w-[min(380px,calc(100vw-3rem))] sm:w-[420px] h-[650px] max-h-[85vh] flex flex-col overflow-hidden rounded-[2rem] border border-white/40 bg-white/60 backdrop-blur-2xl shadow-2xl"
                     >
                         {/* Header */}
                         <div className="relative flex items-center justify-between p-5 pb-4 border-b border-white/50 bg-white/40 z-10">

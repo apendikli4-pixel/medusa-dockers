@@ -35,7 +35,7 @@ export default function NewsletterForm() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="E-posta adresiniz"
                     aria-label="E-posta adresiniz"
-                    className="flex-1 bg-transparent px-4 py-2 text-sm text-white placeholder:text-white/50 focus:outline-none"
+                    className="flex-1 min-w-0 bg-transparent px-4 py-2 text-sm text-white placeholder:text-white/50 focus:outline-none"
                 />
                 <button
                     type="submit"
