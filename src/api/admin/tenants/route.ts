@@ -16,14 +16,17 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
 import { TENANT_MODULE } from "../../../modules/tenant"
 import type TenantService from "../../../modules/tenant/service"
+import { VALID_SECTORS } from "../../../modules/tenant/service"
 import { createTenantProvisioningWorkflow } from "../../../workflows/create-tenant"
 
 // ─── ZOD ŞEMALARI ───
 
 /**
- * Sektör enum değerleri — model ile senkron tutulmalı.
+ * Sektör enum'u TEK KAYNAKTAN (tenant modülü VALID_SECTORS) türetilir — kopya
+ * liste tutulmaz. Eski kopya 4 sektörde kalmıştı; "vape"/"pool" mağazaları
+ * admin API'den oluşturulamıyordu.
  */
-const SectorSchema = z.enum(["retail", "horeca", "b2b", "fashion"])
+const SectorSchema = z.enum(VALID_SECTORS)
 
 /**
  * Desteklenen özellikler — yalnızca bu değerler kabul edilir.

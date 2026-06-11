@@ -22,10 +22,18 @@ import type {
 } from "./types"
 
 /**
- * Sektör enum değerleri — Zod validasyonunda da kullanılır.
+ * Sektör enum değerleri — Zod validasyonunda da kullanılır (TEK KAYNAK).
  * Medusa DML'de native enum olmadığından, bu sabit dizi ile kontrol sağlanır.
+ *
+ * Storefront tema sistemi (storefront/src/lib/themes.ts SectorKey) ile senkron
+ * tutulur. Yeni sektör eklerken iki yeri birden güncelle:
+ *   1) Bu liste (backend validasyonu — admin API bunu kullanır)
+ *   2) storefront SECTOR_THEMES (tema + metin preset'i; tanımsızsa universal'a düşer)
  */
-export const VALID_SECTORS = ["retail", "horeca", "b2b", "fashion"] as const
+export const VALID_SECTORS = [
+    "retail", "horeca", "b2b", "fashion",
+    "electronics", "vape", "pool", "universal", "villa",
+] as const
 export type TenantSector = typeof VALID_SECTORS[number]
 
 /**
