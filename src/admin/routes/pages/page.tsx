@@ -18,6 +18,9 @@ const PagesListPage = () => {
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
     const [newTitle, setNewTitle] = useState("")
+    // Çoklu mağaza: yeni sayfa hangi mağazaya ait olacak?
+    const [tenants, setTenants] = useState<any[]>([])
+    const [selectedTenantId, setSelectedTenantId] = useState<string>("")
 
     const load = () => {
         setLoading(true)
@@ -29,6 +32,21 @@ const PagesListPage = () => {
     }
     useEffect(() => { load() }, [])
 
+    // Mağaza listesini çek (varsayılanı seçili yap).
+    useEffect(() => {
+        fetch("/admin/tenants", { credentials: "include" })
+            .then(r => r.json())
+            .then(d => {
+                const list = d.tenants || []
+                setTenants(list)
+                const def = list.find((t: any) => t.slug === "default") || list[0]
+                if (def) setSelectedTenantId(def.id)
+            })
+            .catch(() => { /* tenant modülü yoksa tek mağaza modunda sessizce geç */ })
+    }, [])
+
+    const tenantName = (id?: string) => tenants.find(t => t.id === id)?.name || null
+
     const createPage = async () => {
         if (!newTitle.trim()) { toast.error("Başlık girin"); return }
         setCreating(true)
@@ -37,7 +55,13 @@ const PagesListPage = () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ title: newTitle.trim(), slug: slugify(newTitle), content: "", status: "draft" }),
+                body: JSON.stringify({
+                    title: newTitle.trim(),
+                    slug: slugify(newTitle),
+                    content: "",
+                    status: "draft",
+                    ...(selectedTenantId ? { tenant_id: selectedTenantId } : {}),
+                }),
             })
             if (!res.ok) throw new Error()
             const d = await res.json()
@@ -63,6 +87,20 @@ const PagesListPage = () => {
                     <Label size="small">Yeni Sayfa Başlığı</Label>
                     <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Örn: Hakkımızda" />
                 </div>
+                {tenants.length > 1 && (
+                    <div className="flex flex-col gap-1">
+                        <Label size="small">Mağaza</Label>
+                        <select
+                            className="h-8 rounded-md border border-ui-border-base bg-ui-bg-field px-2 text-sm text-ui-fg-base"
+                            value={selectedTenantId}
+                            onChange={e => setSelectedTenantId(e.target.value)}
+                        >
+                            {tenants.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <Button variant="primary" onClick={createPage} isLoading={creating}>+ Yeni Sayfa</Button>
             </div>
 
@@ -77,6 +115,7 @@ const PagesListPage = () => {
                             <tr className="text-left text-ui-fg-subtle border-b border-ui-border-base">
                                 <th className="py-2">Başlık</th>
                                 <th className="py-2">Slug (URL)</th>
+                                {tenants.length > 1 && <th className="py-2">Mağaza</th>}
                                 <th className="py-2">Durum</th>
                                 <th className="py-2 text-right">Görüntülenme</th>
                             </tr>
@@ -90,6 +129,11 @@ const PagesListPage = () => {
                                 >
                                     <td className="py-3 font-medium text-ui-fg-interactive">{p.title}</td>
                                     <td className="py-3 text-ui-fg-subtle">/{p.slug}</td>
+                                    {tenants.length > 1 && (
+                                        <td className="py-3">
+                                            <Badge color="blue">{tenantName(p.tenant_id) || "—"}</Badge>
+                                        </td>
+                                    )}
                                     <td className="py-3">
                                         <Badge color={p.status === "published" ? "green" : "grey"}>
                                             {p.status === "published" ? "Yayınlanmış" : "Taslak"}

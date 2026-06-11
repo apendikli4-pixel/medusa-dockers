@@ -9,7 +9,9 @@ const PageUpdateSchema = z.object({
     content: z.string().optional(),
     seo_title: z.string().optional(),
     seo_description: z.string().optional(),
-    status: z.enum(["draft", "published", "archived"]).optional()
+    status: z.enum(["draft", "published", "archived"]).optional(),
+    // Çoklu mağaza: sayfayı başka bir mağazaya taşımak için.
+    tenant_id: z.string().optional().nullable(),
 })
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {

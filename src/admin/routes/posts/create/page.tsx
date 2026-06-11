@@ -1,5 +1,5 @@
 import { Container, Heading, Input, Textarea, Button, Label, toast, Badge } from "@medusajs/ui"
-import { useState, ChangeEvent, FormEvent } from "react"
+import { useState, useEffect, ChangeEvent, FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { Sparkles, ArrowPath } from "@medusajs/icons"
 import { CreatePostInput } from "../../../../types"
@@ -8,6 +8,8 @@ const CreatePostPage = () => {
     const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
     const [aiLoading, setAiLoading] = useState(false)
+    // Çoklu mağaza: yazı hangi mağazaya ait olacak?
+    const [tenants, setTenants] = useState<any[]>([])
 
     const [formData, setFormData] = useState({
         title: "",
@@ -20,9 +22,23 @@ const CreatePostPage = () => {
         excerpt: "",
         seo_title: "",
         seo_description: "",
+        tenant_id: "",
     })
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Mağaza listesini çek (varsayılanı seçili yap).
+    useEffect(() => {
+        fetch("/admin/tenants", { credentials: "include" })
+            .then(r => r.json())
+            .then(d => {
+                const list = d.tenants || []
+                setTenants(list)
+                const def = list.find((t: any) => t.slug === "default") || list[0]
+                if (def) setFormData(prev => ({ ...prev, tenant_id: def.id }))
+            })
+            .catch(() => { /* tek mağaza modu */ })
+    }, [])
+
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
@@ -186,6 +202,24 @@ const CreatePostPage = () => {
                         />
                     </div>
                 </div>
+
+                {/* STORE (TENANT) SELECTOR — çoklu mağaza */}
+                {tenants.length > 1 && (
+                    <div className="flex flex-col gap-2 max-w-md">
+                        <Label htmlFor="tenant_id">Mağaza (bu yazı hangi mağazada görünecek?)</Label>
+                        <select
+                            id="tenant_id"
+                            name="tenant_id"
+                            className="h-9 rounded-md border border-ui-border-base bg-ui-bg-field px-2 text-sm text-ui-fg-base"
+                            value={formData.tenant_id}
+                            onChange={handleChange}
+                        >
+                            {tenants.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* IMAGE URL */}
                 <div className="flex flex-col gap-2">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { Metadata } from "next"
+import { headers } from "next/headers"
 import { renderContent } from "@/lib/markdown"
 
 async function getPageBySlug(slug: string) {
@@ -13,9 +14,15 @@ async function getPageBySlug(slug: string) {
         process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
         process.env.MEDUSA_PUBLISHABLE_KEY
 
+    // Çoklu mağaza: aktif mağazayı (tenant) backend'e bildir → doğru mağazanın sayfası.
+    const tenantSlug = (await headers()).get("x-tenant-slug") || "default"
+
     try {
         const res = await fetch(`${baseUrl}/store/pages/${slug}`, {
-            headers: apiKey ? { "x-publishable-api-key": apiKey } : {},
+            headers: {
+                ...(apiKey ? { "x-publishable-api-key": apiKey } : {}),
+                "x-tenant-slug": tenantSlug,
+            },
             next: { revalidate: 60 } // Cache for 60 seconds
         })
 

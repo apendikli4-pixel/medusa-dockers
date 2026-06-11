@@ -18,8 +18,11 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const limit = parseInt((req.query.limit as string) || "20", 10)
     const offset = parseInt((req.query.offset as string) || "0", 10)
 
+    // Çoklu mağaza: yalnızca AKTİF mağazanın (tenant) yazıları görünür.
+    const tenantId = (req as any).tenant_id
+
     const [posts, count] = await content.listAndCountPosts(
-        { status: "published" },
+        { status: "published", ...(tenantId ? { tenant_id: tenantId } : {}) },
         {
             select: ["id", "slug", "title", "excerpt", "image", "published_at", "created_at"],
             skip: offset,

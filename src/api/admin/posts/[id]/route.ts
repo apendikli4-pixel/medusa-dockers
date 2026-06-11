@@ -23,6 +23,8 @@ const UpdateSchema = z.object({
     excerpt: z.string().optional().nullable(),
     seo_title: z.string().optional().nullable(),
     seo_description: z.string().optional().nullable(),
+    // Çoklu mağaza: yazıyı başka bir mağazaya taşımak için.
+    tenant_id: z.string().optional().nullable(),
 })
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Unknown error")
@@ -56,6 +58,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         if (data.excerpt !== undefined) updateData.excerpt = data.excerpt || null
         if (data.seo_title !== undefined) updateData.seo_title = data.seo_title || null
         if (data.seo_description !== undefined) updateData.seo_description = data.seo_description || null
+        if (data.tenant_id !== undefined) updateData.tenant_id = data.tenant_id || null
         if (data.status) {
             updateData.status = data.status
             if (data.status === "published") updateData.published_at = new Date()

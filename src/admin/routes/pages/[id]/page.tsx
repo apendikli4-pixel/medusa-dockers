@@ -9,9 +9,11 @@ const EditPagePage = () => {
     const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
     const [pageLoading, setPageLoading] = useState(true)
+    // Çoklu mağaza: sayfa hangi mağazaya ait?
+    const [tenants, setTenants] = useState([])
     const [form, setForm] = useState({
         title: "", slug: "", content: "",
-        seo_title: "", seo_description: "", status: "draft",
+        seo_title: "", seo_description: "", status: "draft", tenant_id: "",
     })
 
     useEffect(() => {
@@ -23,12 +25,20 @@ const EditPagePage = () => {
                 setForm({
                     title: p.title || "", slug: p.slug || "", content: p.content || "",
                     seo_title: p.seo_title || "", seo_description: p.seo_description || "",
-                    status: p.status || "draft",
+                    status: p.status || "draft", tenant_id: p.tenant_id || "",
                 })
                 setPageLoading(false)
             })
             .catch(() => { toast.error("Sayfa yüklenirken hata oluştu."); setPageLoading(false) })
     }, [id])
+
+    // Mağaza listesini çek.
+    useEffect(() => {
+        fetch("/admin/tenants", { credentials: "include" })
+            .then(r => r.json())
+            .then(d => setTenants(d.tenants || []))
+            .catch(() => { /* tek mağaza modu */ })
+    }, [])
 
     const change = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
@@ -76,6 +86,22 @@ const EditPagePage = () => {
                     <Button variant="danger" onClick={remove}><Trash /></Button>
                 </div>
             </div>
+
+            {tenants.length > 1 && (
+                <div className="flex flex-col gap-2 max-w-md">
+                    <Label>Mağaza (bu sayfa hangi mağazada görünecek?)</Label>
+                    <select
+                        name="tenant_id"
+                        className="h-9 rounded-md border border-ui-border-base bg-ui-bg-field px-2 text-sm text-ui-fg-base"
+                        value={form.tenant_id}
+                        onChange={change}
+                    >
+                        {tenants.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">

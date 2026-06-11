@@ -7,6 +7,8 @@ import { Post, PostListResponse } from "../../../types"
 const PostsPage = () => {
     const [posts, setPosts] = useState<Post[]>([])
     const [loading, setLoading] = useState(true)
+    // Çoklu mağaza: yazının ait olduğu mağazayı listede göstermek için.
+    const [tenants, setTenants] = useState<any[]>([])
 
     useEffect(() => {
         // Fetch posts from Admin API
@@ -21,6 +23,16 @@ const PostsPage = () => {
                 setLoading(false)
             })
     }, [])
+
+    useEffect(() => {
+        fetch("/admin/tenants", { credentials: "include" })
+            .then((r) => r.json())
+            .then((d) => setTenants(d.tenants || []))
+            .catch(() => { /* tek mağaza modu */ })
+    }, [])
+
+    const multiStore = tenants.length > 1
+    const tenantName = (id?: string) => tenants.find((t) => t.id === id)?.name || "—"
 
     return (
         <Container className="p-8">
@@ -37,6 +49,7 @@ const PostsPage = () => {
                     <Table.Row>
                         <Table.HeaderCell>Başlık</Table.HeaderCell>
                         <Table.HeaderCell>Slug (URL)</Table.HeaderCell>
+                        {multiStore && <Table.HeaderCell>Mağaza</Table.HeaderCell>}
                         <Table.HeaderCell>Durum</Table.HeaderCell>
                         <Table.HeaderCell>Tarih</Table.HeaderCell>
                     </Table.Row>
@@ -44,11 +57,11 @@ const PostsPage = () => {
                 <Table.Body>
                     {loading ? (
                         <Table.Row>
-                            <Table.Cell {...({ colSpan: 4 } as any)} className="text-center p-4">Yükleniyor...</Table.Cell>
+                            <Table.Cell {...({ colSpan: multiStore ? 5 : 4 } as any)} className="text-center p-4">Yükleniyor...</Table.Cell>
                         </Table.Row>
                     ) : posts.length === 0 ? (
                         <Table.Row>
-                            <Table.Cell {...({ colSpan: 4 } as any)} className="text-center p-4">Henüz hiç yazı yok.</Table.Cell>
+                            <Table.Cell {...({ colSpan: multiStore ? 5 : 4 } as any)} className="text-center p-4">Henüz hiç yazı yok.</Table.Cell>
                         </Table.Row>
                     ) : (
                         posts.map((post) => (
@@ -59,6 +72,11 @@ const PostsPage = () => {
                                     </a>
                                 </Table.Cell>
                                 <Table.Cell className="text-ui-fg-subtle">{post.slug}</Table.Cell>
+                                {multiStore && (
+                                    <Table.Cell>
+                                        <StatusBadge color="blue">{tenantName((post as any).tenant_id)}</StatusBadge>
+                                    </Table.Cell>
+                                )}
                                 <Table.Cell>
                                     <StatusBadge color={post.status === "published" ? "green" : "grey"}>
                                         {post.status === "published" ? "Yayınlanmış" : "Taslak"}

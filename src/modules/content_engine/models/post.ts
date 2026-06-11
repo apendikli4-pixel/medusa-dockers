@@ -3,7 +3,10 @@ import { model } from "@medusajs/framework/utils"
 export const Post = model.define("post", {
     id: model.id().primaryKey(),
     title: model.text(),
-    slug: model.text().unique(),
+    // slug artık global değil, tenant başına benzersiz (composite index migration'da).
+    slug: model.text(),
+    // Hangi mağazaya (tenant) ait — çoklu mağaza blog izolasyonu.
+    tenant_id: model.text().nullable(),
     content: model.text(),
     image: model.text().nullable(),
     metadata: model.json().nullable(),

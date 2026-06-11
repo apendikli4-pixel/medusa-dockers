@@ -12,6 +12,8 @@ const EditPostPage = () => {
     const [pageLoading, setPageLoading] = useState(true)
     const [aiLoading, setAiLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
+    // Çoklu mağaza: yazı hangi mağazaya ait?
+    const [tenants, setTenants] = useState([])
 
     const [formData, setFormData] = useState({
         title: "",
@@ -20,6 +22,7 @@ const EditPostPage = () => {
         image: "",
         metadata: "{}",
         status: "published",
+        tenant_id: "",
     })
 
     useEffect(() => {
@@ -35,7 +38,8 @@ const EditPostPage = () => {
                     content: post.content || "",
                     image: post.image || "",
                     metadata: JSON.stringify(post.metadata || {}, null, 2),
-                    status: post.status || "published"
+                    status: post.status || "published",
+                    tenant_id: (post as any).tenant_id || "",
                 })
                 setPageLoading(false)
             })
@@ -46,7 +50,15 @@ const EditPostPage = () => {
             })
     }, [id])
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Mağaza listesini çek.
+    useEffect(() => {
+        fetch("/admin/tenants", { credentials: "include" })
+            .then(r => r.json())
+            .then(d => setTenants(d.tenants || []))
+            .catch(() => { /* tek mağaza modu */ })
+    }, [])
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
@@ -239,6 +251,24 @@ const EditPostPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+
+                {/* STORE (TENANT) SELECTOR — çoklu mağaza */}
+                {tenants.length > 1 && (
+                    <div className="flex flex-col gap-2 max-w-md">
+                        <Label htmlFor="tenant_id">Mağaza (bu yazı hangi mağazada görünecek?)</Label>
+                        <select
+                            id="tenant_id"
+                            name="tenant_id"
+                            className="h-9 rounded-md border border-ui-border-base bg-ui-bg-field px-2 text-sm text-ui-fg-base"
+                            value={formData.tenant_id}
+                            onChange={handleChange}
+                        >
+                            {tenants.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* TITLE & SLUG */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

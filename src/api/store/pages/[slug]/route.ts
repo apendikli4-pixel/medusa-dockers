@@ -6,10 +6,12 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const { slug } = req.params
     const service: ContentEngineService = req.scope.resolve("content_engine")
     
-    // Find page by slug where status is published
+    // Çoklu mağaza: sayfa yalnızca AKTİF mağazaya (tenant) aitse görünür.
+    const tenantId = (req as any).tenant_id
     const [pages] = await service.listAndCountPages({
         slug,
-        status: "published"
+        status: "published",
+        ...(tenantId ? { tenant_id: tenantId } : {}),
     })
 
     const page = pages[0]

@@ -11,7 +11,9 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const { slug } = req.params
     const content = req.scope.resolve(CONTENT_ENGINE_MODULE) as any
 
-    const posts = await content.listPosts({ slug, status: "published" })
+    // Çoklu mağaza: yazı yalnızca AKTİF mağazaya aitse görünür.
+    const tenantId = (req as any).tenant_id
+    const posts = await content.listPosts({ slug, status: "published", ...(tenantId ? { tenant_id: tenantId } : {}) })
     const p = posts?.[0]
     if (!p) {
         throw new MedusaError(MedusaError.Types.NOT_FOUND, "Blog yazısı bulunamadı")
