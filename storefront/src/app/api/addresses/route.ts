@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function GET(req: NextRequest) {
     try {
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         const res = await fetch(`${BACKEND_URL}/store/customers/me/addresses`, {
             method: "GET",
             headers: {
-                "x-publishable-api-key": PUBLISHABLE_KEY,
+                ...(await backendProxyHeaders()),
                 "cookie": cookie,
             },
         })
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-publishable-api-key": PUBLISHABLE_KEY,
+                ...(await backendProxyHeaders()),
                 "cookie": cookie,
             },
             body: JSON.stringify(body),

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ itemId: string }> }) {
     try {
@@ -14,7 +14,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ itemI
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",
-                "x-publishable-api-key": PUBLISHABLE_KEY,
+                ...(await backendProxyHeaders()),
                 "Cookie": cookieStr
             }
         })

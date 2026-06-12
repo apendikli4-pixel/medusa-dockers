@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
@@ -14,9 +14,7 @@ export async function GET(req: Request) {
 
     try {
         const response = await fetch(`${BACKEND_URL}/store/products/${productId}/reviews`, {
-            headers: {
-                "x-publishable-api-key": PUBLISHABLE_KEY,
-            },
+            headers: await backendProxyHeaders(),
             next: { revalidate: 60 } // Cache for 60s
         })
         
@@ -36,7 +34,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-publishable-api-key": PUBLISHABLE_KEY,
+                ...(await backendProxyHeaders()),
                 "Cookie": cookieStore.toString(),
             },
             body: JSON.stringify(body),

@@ -131,6 +131,9 @@
 .ag-search button:hover:not(:disabled) { background: var(--ag-primary-hover); }
 .ag-search button:disabled { opacity: 0.6; }
 @media (max-width: 720px) { .ag-search { max-width: none; flex-basis: 100%; order: 3; } .ag-header-inner { flex-wrap: wrap; } }
+/* Mobil menü çekmecesinde yukarıdaki header-amaçlı kural geçersiz:
+   dikey flex'te flex-basis:100% kutuyu boydan boya şişirir, order:3 en alta atar. */
+.mobile-menu-search .ag-search { max-width: none; flex-basis: auto; order: 0; }
 .ag-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.1rem; }
 .ag-brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--ag-primary); color: white; border-radius: 6px; font-weight: 700; }
 .ag-nav { display: flex; gap: 1.25rem; align-items: center; font-size: 0.95rem; }

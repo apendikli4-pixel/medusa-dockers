@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function POST(req: Request) {
     try {
         const body = await req.json()
-        
+
         const response = await fetch(`${BACKEND_URL}/store/contact`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-publishable-api-key": PUBLISHABLE_KEY
+                ...(await backendProxyHeaders())
             },
             body: JSON.stringify(body)
         })

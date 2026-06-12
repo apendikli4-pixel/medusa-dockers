@@ -4,7 +4,8 @@ import { retrieveCustomer } from "@/lib/server/customer"
 import { retrieveCurrentTenant } from "@/lib/server/tenant"
 import { getSectorTheme } from "@/lib/themes"
 import SearchBox from "./SearchBox"
-import { ShoppingBag, User, Menu } from "lucide-react"
+import MobileMenu from "./MobileMenu"
+import { ShoppingBag, User } from "lucide-react"
 
 export default async function Header({ countryCode }: { countryCode: string }) {
     const [cart, customer, tenant] = await Promise.all([
@@ -21,14 +22,12 @@ export default async function Header({ countryCode }: { countryCode: string }) {
         <header className="glass-header">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-8">
 
-                {/* Mobile Menu Icon */}
-                <button
-                    className="md:hidden hover:opacity-70 transition-opacity"
-                    style={{ color: "var(--ag-text)" }}
-                    aria-label="Menü"
-                >
-                    <Menu size={24} />
-                </button>
+                {/* Mobil menü: arama + hesap + ana linkler (çekmece) */}
+                <MobileMenu
+                    countryCode={countryCode}
+                    loggedIn={!!customer}
+                    customerLabel={customer ? (customer.first_name || customer.email.split("@")[0]) : null}
+                />
 
                 {/* Brand Logo */}
                 <Link href={`/${countryCode}`} className="flex items-center gap-3 group">

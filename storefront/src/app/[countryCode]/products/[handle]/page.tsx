@@ -142,12 +142,14 @@ export default async function ProductDetailPage({
                         </p>
                     </div>
                     
-                    {/* Villa & Rezervasyon / E-ticaret Ayrımı */}
+                    {/* Villa & Rezervasyon / E-ticaret Ayrımı — sunucu tarafında
+                        tenant.sector'a göre. (Önceki group-[html[data-sector]] CSS
+                        seçicisi geçersizdi: atada .group sınıfı olmadığından villa
+                        mağazasında rezervasyon kutusu HİÇ görünmüyordu.) */}
                     <div className="mt-auto pt-8">
                         {variant ? (
-                            <div className="flex flex-col gap-4">
-                                {/* Eğer villa teması aktifse Rezervasyon takvimi gösterilecek */}
-                                <div className="hidden group-[html[data-sector='villa']]:block bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-4">
+                            (tenant?.sector || "").toLowerCase() === "villa" ? (
+                                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                                     <h3 className="font-semibold text-gray-900 mb-4">Rezervasyon Yap</h3>
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
@@ -163,12 +165,9 @@ export default async function ProductDetailPage({
                                         Müsaitliği Kontrol Et & Kirala
                                     </button>
                                 </div>
-                                
-                                {/* Aksi halde standart sepete ekle (display logic css ile çözüldü) */}
-                                <div className="block group-[html[data-sector='villa']]:hidden">
-                                    <AddToCartButton variantId={variant.id} />
-                                </div>
-                            </div>
+                            ) : (
+                                <AddToCartButton variantId={variant.id} />
+                            )
                         ) : (
                             <p className="text-red-500 bg-red-50 p-4 rounded-xl border border-red-100 font-medium">Varyant tanımlanmamış</p>
                         )}

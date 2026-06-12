@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server"
+import { headers } from "next/headers"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
+import { deriveTenantSlug } from "@/lib/tenant-slug"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function GET() {
     try {
-        const response = await fetch(`${BACKEND_URL}/store/faq`, {
-            headers: {
-                "x-publishable-api-key": PUBLISHABLE_KEY
-            },
+        // Slug URL'ye de eklenir: fetch cache anahtarı kesin olarak mağaza-bazlı
+        // ayrışsın (Vozol, Aqua'nın 1 saatlik SSS cache'ini devralmasın).
+        const hdrs = await headers()
+        const slug = deriveTenantSlug(hdrs.get("host") || "")
+        const response = await fetch(`${BACKEND_URL}/store/faq?tenant=${encodeURIComponent(slug)}`, {
+            headers: await backendProxyHeaders(),
             next: { revalidate: 3600 } // SSS sayfaları sık değişmez, 1 saat cache
         })
         

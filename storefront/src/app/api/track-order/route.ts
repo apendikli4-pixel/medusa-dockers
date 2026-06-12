@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
+import { backendProxyHeaders } from "@/lib/server/proxy-headers"
 
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         const response = await fetch(url.toString(), {
             method: "GET",
             headers: {
-                "x-publishable-api-key": PUBLISHABLE_KEY,
+                ...(await backendProxyHeaders()),
                 "Content-Type": "application/json"
             },
             // Verilerin anlık değişebilme ihtimaline karşı cache süresi kısa tutulur
