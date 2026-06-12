@@ -307,11 +307,12 @@ export function createRateLimiter(
  * Predefined rate limiters
  */
 export const RATE_LIMITERS = {
+    // Mesajlar TÜRKÇE: müşteriye/yöneticiye dönen metinlerde dil kuralı geçerli.
     // Ayna chat: 20 req/min free, 100 pro, 500 enterprise
     aynaChat: createRateLimiter({
         windowMs: 60000,
         maxRequests: 20,
-        message: "AI chat limit reached. Please try again in a moment.",
+        message: "AI sohbet limitine ulaşıldı. Lütfen kısa bir süre sonra tekrar deneyin.",
         tenantTier: "free",
     }),
 
@@ -319,7 +320,7 @@ export const RATE_LIMITERS = {
     contentGeneration: createRateLimiter({
         windowMs: 60000,
         maxRequests: 5,
-        message: "Content generation limit reached. Please try again later.",
+        message: "İçerik üretim limitine ulaşıldı. Lütfen daha sonra tekrar deneyin.",
         tenantTier: "free",
     }),
 
@@ -327,7 +328,7 @@ export const RATE_LIMITERS = {
     search: createRateLimiter({
         windowMs: 60000,
         maxRequests: 30,
-        message: "Search limit reached. Please try again.",
+        message: "Arama limitine ulaşıldı. Lütfen tekrar deneyin.",
         tenantTier: "free",
     }),
 
@@ -335,7 +336,7 @@ export const RATE_LIMITERS = {
     api: createRateLimiter({
         windowMs: 60000,
         maxRequests: 100,
-        message: "API rate limit exceeded.",
+        message: "API istek limiti aşıldı.",
         tenantTier: "free",
     }),
 
@@ -343,7 +344,7 @@ export const RATE_LIMITERS = {
     admin: createRateLimiter({
         windowMs: 60000,
         maxRequests: 200,
-        message: "Admin operation limit exceeded.",
+        message: "Yönetici işlem limiti aşıldı.",
         tenantTier: "enterprise",
     }),
 }

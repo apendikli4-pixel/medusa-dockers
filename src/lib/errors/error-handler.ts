@@ -25,6 +25,19 @@ import {
     InternalError,
 } from "./api-error"
 
+// Route'lar hata sınıflarını tek modülden alabilsin (api-error'ı ayrıca
+// import etmek zorunda kalmasın) — chat route'u bunlara buradan erişiyor.
+export {
+    ApiError,
+    ValidationError,
+    AuthenticationError,
+    AuthorizationError,
+    NotFoundError,
+    RateLimitError,
+    ServiceUnavailableError,
+    InternalError,
+} from "./api-error"
+
 /**
  * Generate or extract request ID for tracing
  */
@@ -201,7 +214,9 @@ export function createErrorHandler(logger: any) {
  *   })
  */
 export function errorHandlerWrapper(
-    handler: (req: MedusaRequest, res: MedusaResponse) => Promise<void>
+    // Promise<unknown>: handler'lar `return res.status(...).json(...)` deseni
+    // kullanabilir (Express idiomu) — dönüş değeri zaten kullanılmıyor.
+    handler: (req: MedusaRequest, res: MedusaResponse) => Promise<unknown>
 ) {
     return async (req: MedusaRequest, res: MedusaResponse) => {
         try {

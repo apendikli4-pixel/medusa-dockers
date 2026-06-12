@@ -25,7 +25,8 @@ import {
     resolveServices,
     createServiceRegistry,
 } from "../../../../lib/dependencies/service-resolver"
-import { checkRateLimit, RATE_LIMITERS } from "../../../../lib/rate-limiting/multi-tenant-limiter"
+import { RATE_LIMITERS } from "../../../../lib/rate-limiting/multi-tenant-limiter"
+import { Logger } from "@medusajs/framework/types"
 
 /**
  * Request validation schema
@@ -46,8 +47,12 @@ async function checkOllamaHealth(
     logger: SafeLogger,
     timeoutMs: number = 5000
 ): Promise<boolean> {
-    if (!aynaService?.isHealthy) {
-        return false
+    // isHealthy() ayna servisinde (henüz) tanımlı değil. Tanımsızken SAĞLIKLI
+    // varsayılmalı: aksi halde her istek fallback'e düşer ve chat tamamen susar.
+    // Ayrıca hybridAIProvider'ın kendi katmanlı fallback'i var (Gemini → statik);
+    // ön-kapı devre kesici yalnızca gerçek bir sağlık sinyali varsa anlamlı.
+    if (typeof aynaService?.isHealthy !== "function") {
+        return true
     }
 
     try {
@@ -78,7 +83,7 @@ async function checkOllamaHealth(
 function getFallbackResponse(tenantId: string): { response: string; fallback: boolean } {
     return {
         response:
-            "I'm temporarily unable to respond. Our AI system is being updated. Please try again in a moment.",
+            "Şu an geçici olarak yanıt veremiyorum; sistemimiz güncelleniyor. Lütfen birkaç dakika sonra tekrar deneyin.",
         fallback: true,
     }
 }
@@ -88,13 +93,16 @@ function getFallbackResponse(tenantId: string): { response: string; fallback: bo
  */
 export const POST = errorHandlerWrapper(async (req: MedusaRequest, res: MedusaResponse) => {
     const timer = startTimer()
-    const logger = new SafeLogger(req.scope.resolve("logger"))
+    const rawLogger = req.scope.resolve("logger") as Logger
+    const logger = new SafeLogger(rawLogger)
     const tenantId = (req as any).tenant_id || "tnt_unknown"
 
     // 1. Rate limiting (multi-tenant, per-tier)
-    const rateLimitOk = await checkRateLimit(req, res, RATE_LIMITERS.aynaChat, logger.logger)
+    // RATE_LIMITERS.aynaChat zaten (req,res,logger) alan hazır bir fonksiyon —
+    // checkRateLimit'e config diye geçilemez (orijinal kod tip hatasıydı).
+    const rateLimitOk = await RATE_LIMITERS.aynaChat(req, res, rawLogger)
     if (rateLimitOk !== true) {
-        return // Response already sent by checkRateLimit
+        return // Response already sent by rate limiter
     }
 
     // 2. Request validation (Zod)
@@ -127,11 +135,11 @@ export const POST = errorHandlerWrapper(async (req: MedusaRequest, res: MedusaRe
             product: Modules.PRODUCT,
             inventory: Modules.INVENTORY,
         },
-        logger.logger,
+        rawLogger,
         { logWarning: true }
     )
 
-    const remoteQuery = await resolveService(req.scope, "remoteQuery", logger.logger, {
+    const remoteQuery = await resolveService(req.scope, "remoteQuery", rawLogger, {
         logWarning: true,
     })
 
@@ -214,7 +222,7 @@ export const POST = errorHandlerWrapper(async (req: MedusaRequest, res: MedusaRe
             // Timeout → graceful degradation
             return res.status(200).json({
                 response:
-                    "Your question took too long to answer. Please try a simpler question or try again shortly.",
+                    "Sorunuzun yanıtı beklenenden uzun sürdü. Lütfen daha kısa/basit bir soruyla tekrar deneyin.",
                 fallback: true,
             })
         }
