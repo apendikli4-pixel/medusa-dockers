@@ -157,6 +157,20 @@ services:
       - medusa_network
 
   # ═══════════════════════════════════════════════════════════════
+  # OpenTelemetry (Jaeger) - İzlenebilirlik Altyapısı
+  # ═══════════════════════════════════════════════════════════════
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: medusa_jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # Web UI
+      - "4317:4317"   # OTLP gRPC (opsiyonel)
+      - "4318:4318"   # OTLP HTTP
+    networks:
+      - medusa_network
+
+  # ═══════════════════════════════════════════════════════════════
   # MEDUSA SERVER (API ONLY)
   # ═══════════════════════════════════════════════════════════════
   medusa-server:
@@ -169,6 +183,8 @@ services:
         condition: service_healthy
       redis-master:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     command: [ "/bin/sh", "./start.sh" ]
     ports:
       - "9000:9000"
@@ -186,6 +202,9 @@ services:
       - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
       - REDIS_SENTINEL_MASTER_NAME=medusa-master
       - REDIS_PASSWORD=R3d1sSecurePass2026
+      # OpenTelemetry Config
+      - OTEL_SERVICE_NAME=medusa-server
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     env_file:
       - .env
     volumes:
@@ -206,6 +225,7 @@ services:
       - medusa-server
       - postgres
       - redis-master
+      - jaeger
     command: [ "/bin/sh", "./start.sh" ]
     environment:
       - NODE_ENV=production
@@ -221,6 +241,9 @@ services:
       - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
       - REDIS_SENTINEL_MASTER_NAME=medusa-master
       - REDIS_PASSWORD=R3d1sSecurePass2026
+      # OpenTelemetry Config
+      - OTEL_SERVICE_NAME=medusa-worker
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     env_file:
       - .env
     volumes:

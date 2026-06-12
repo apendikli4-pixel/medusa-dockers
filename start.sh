@@ -6,6 +6,20 @@ set -ex
 # MEDUSA V2 - DEBUG STARTUP GUARDIAN
 # ==============================================================================
 
+# OBSERVABILITY: OpenTelemetry Instrumentation — VARSAYILAN KAPALI (opt-in).
+# Yalnızca ENABLE_OPENTELEMETRY=true VE bir OTLP collector adresi (OTEL_EXPORTER_OTLP_ENDPOINT)
+# verildiğinde açılır. Aksi halde:
+#   - Collector yoksa (Coolify üretiminde Jaeger yok) her başlangıçta localhost:4318'e
+#     başarısız bağlantı denemeleri + log gürültüsü olur.
+#   - ts-node/register her başlatmada TS derleme yükü getirir.
+# Açmak için (örn. yerelde Jaeger ile): ENABLE_OPENTELEMETRY=true + OTEL_EXPORTER_OTLP_ENDPOINT.
+if [ "$ENABLE_OPENTELEMETRY" = "true" ] && [ -n "$OTEL_EXPORTER_OTLP_ENDPOINT" ] && [ -f "/server/src/instrumentation.ts" ]; then
+    echo "OpenTelemetry AÇIK → $OTEL_EXPORTER_OTLP_ENDPOINT (NODE_OPTIONS ile yükleniyor)..."
+    export NODE_OPTIONS="--require ts-node/register --require ./src/instrumentation.ts ${NODE_OPTIONS:-}"
+else
+    echo "OpenTelemetry KAPALI (varsayılan). Açmak için: ENABLE_OPENTELEMETRY=true + OTEL_EXPORTER_OTLP_ENDPOINT."
+fi
+
 echo "Backend Deployment Initializing..."
 echo "Waiting for postgres:5432 to be ready..."
 while ! nc -z postgres 5432; do
