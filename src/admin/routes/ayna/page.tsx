@@ -1,15 +1,22 @@
 // @ts-nocheck
 import { defineRouteConfig } from "@medusajs/admin-sdk"
-import { Container, Heading, Text, Button, Textarea } from "@medusajs/ui"
+import { Container, Heading, Text, Button, Textarea, Select } from "@medusajs/ui"
 import { Sparkles, ArrowRightOnRectangle } from "@medusajs/icons"
 import { useState, useRef, useEffect } from "react"
 
 const AynaDashboardPage = () => {
     const [messages, setMessages] = useState<{ role: string, content: string }[]>([
-        { role: "agent", content: "Sistem Yöneticisi doğrulandı. Mağaza arayüzünden bağımsız, tam yetkili Ayna Yönetim zihnine hoş geldiniz. \nNe yapmak istersiniz?\nÖrn: 'Apple iPhone fiyatını 80000 yap', 'Yeni bir kulaklık kategorisi oluştur'." }
+        { role: "agent", content: "Sistem Yöneticisi doğrulandı. Mağaza arayüzünden bağımsız, tam yetkili Ayna Yönetim zihnine hoş geldiniz. \nÜstteki menüden İŞLEM YAPILACAK MAĞAZAYI seçin — komutlar yalnızca seçili mağazaya uygulanır.\nÖrn: 'Apple iPhone fiyatını 80000 yap', 'Yeni bir kulaklık kategorisi oluştur'." }
     ])
     const [input, setInput] = useState("")
     const [loading, setLoading] = useState(false)
+    // Mağaza (tenant) seçimi: AI'ın hangi mağazanın kataloğunda işlem yapacağını
+    // belirler. Kimlik sales-channel DEĞİL tenant'tır; backend tenant'ı
+    // x-tenant-id HEADER'ından çözer (tenant-context middleware) — body'ye
+    // store_id koymak İŞE YARAMAZ (şema yalnızca message okur).
+    const [tenants, setTenants] = useState<{ id: string; name: string; sector?: string; slug?: string }[]>([])
+    const [selectedTenantId, setSelectedTenantId] = useState("")
+    const [loadingTenants, setLoadingTenants] = useState(true)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -18,9 +25,37 @@ const AynaDashboardPage = () => {
         }
     }, [messages])
 
+    useEffect(() => {
+        const fetchTenants = async () => {
+            try {
+                const res = await fetch("/admin/tenants?limit=100", { credentials: "include" })
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const data = await res.json()
+                const list = (data.tenants || []).filter((t: any) => t.is_active !== false)
+                setTenants(list)
+                // Varsayılan: slug "default" olan mağaza (Aqua); yoksa ilk kayıt.
+                const def = list.find((t: any) => t.slug === "default") || list[0]
+                if (def) setSelectedTenantId(def.id)
+            } catch (e) {
+                console.error("[Ayna Admin] Mağaza listesi yüklenemedi:", e)
+            } finally {
+                setLoadingTenants(false)
+            }
+        }
+        fetchTenants()
+    }, [])
+
     const handleSend = async () => {
         const userMsg = (input || "").trim()
         if (!userMsg || loading) return
+
+        if (!selectedTenantId) {
+            setMessages(prev => [...prev, {
+                role: "agent",
+                content: "Önce üstteki menüden işlem yapılacak mağazayı seçmelisiniz. Komutlar yalnızca seçili mağazanın kataloğuna uygulanır — yanlış mağazada işlem yapmamak için bu zorunludur."
+            }])
+            return
+        }
 
         setMessages(prev => [...prev, { role: "user", content: userMsg }])
         setInput("")
@@ -29,7 +64,11 @@ const AynaDashboardPage = () => {
         try {
             const res = await fetch("/admin/ayna/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    // Tenant çözümlemesi header ile yapılır (en yüksek öncelik).
+                    "x-tenant-id": selectedTenantId,
+                },
                 body: JSON.stringify({ message: userMsg }),
             })
 
@@ -58,15 +97,45 @@ const AynaDashboardPage = () => {
         <Container className="p-0 h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-ui-bg-base border-none">
             {/* Header */}
             <div className="p-8 border-b bg-ui-bg-subtle/50 backdrop-blur-sm">
-                <div className="flex items-center gap-4">
-                    <div className="bg-blue-500/10 p-3 rounded-xl border border-blue-500/20 shadow-sm">
-                        <Sparkles className="text-blue-500 w-8 h-8 drop-shadow-sm" />
+                <div className="flex items-start justify-between gap-6 flex-wrap">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-blue-500/10 p-3 rounded-xl border border-blue-500/20 shadow-sm">
+                            <Sparkles className="text-blue-500 w-8 h-8 drop-shadow-sm" />
+                        </div>
+                        <div>
+                            <Heading level="h1" className="text-2xl font-bold tracking-tight">Ayna Yönetici Asistanı</Heading>
+                            <Text className="text-ui-fg-muted mt-1 font-medium italic">
+                                Mağazanızın tam kontrolü için sınırsız yetkiye sahip yapay zeka arayüzü.
+                            </Text>
+                        </div>
                     </div>
-                    <div>
-                        <Heading level="h1" className="text-2xl font-bold tracking-tight">Ayna Yönetici Asistanı</Heading>
-                        <Text className="text-ui-fg-muted mt-1 font-medium italic">
-                            Mağazanızın tam kontrolü için sınırsız yetkiye sahip yapay zeka arayüzü.
+
+                    {/* Mağaza seçici — komutlar yalnızca seçili mağazaya uygulanır */}
+                    <div className="w-72">
+                        <Text className="text-xs font-bold text-ui-fg-muted uppercase tracking-wider mb-1.5 block">
+                            İşlem Yapılacak Mağaza
                         </Text>
+                        <Select
+                            value={selectedTenantId}
+                            onValueChange={setSelectedTenantId}
+                            disabled={loadingTenants || loading}
+                        >
+                            <Select.Trigger>
+                                <Select.Value placeholder={loadingTenants ? "Mağazalar yükleniyor..." : "Mağaza seçin..."} />
+                            </Select.Trigger>
+                            <Select.Content>
+                                {tenants.map((t) => (
+                                    <Select.Item key={t.id} value={t.id}>
+                                        {t.name}{t.sector ? ` (${t.sector})` : ""}
+                                    </Select.Item>
+                                ))}
+                            </Select.Content>
+                        </Select>
+                        {!selectedTenantId && !loadingTenants && (
+                            <Text className="text-xs text-ui-fg-error mt-1">
+                                Komut çalıştırmak için mağaza seçin.
+                            </Text>
+                        )}
                     </div>
                 </div>
             </div>
@@ -123,7 +192,7 @@ const AynaDashboardPage = () => {
                             <Button
                                 variant="primary"
                                 onClick={handleSend}
-                                disabled={!((input || "").trim()) || loading}
+                                disabled={!((input || "").trim()) || loading || !selectedTenantId}
                                 className="px-6 rounded-lg gap-2 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
                             >
                                 <span className="font-bold">Komutu Çalıştır</span>
