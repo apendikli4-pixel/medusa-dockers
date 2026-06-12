@@ -92,3 +92,34 @@ export class BigNumber {
     this.numeric = Number.isFinite(v) ? v : NaN
   }
 }
+
+const noopChain = {
+  primaryKey: () => noopChain,
+  index: () => noopChain,
+  unique: () => noopChain,
+  default: () => noopChain,
+  nullable: () => noopChain,
+}
+
+export const model = {
+  define: (name: string, fields: any) => ({ name, fields }),
+  id: () => noopChain,
+  text: () => noopChain,
+  number: () => noopChain,
+  boolean: () => noopChain,
+  dateTime: () => noopChain,
+  json: () => noopChain,
+  enum: () => noopChain,
+  hasOne: () => noopChain,
+  hasMany: () => noopChain,
+  belongsTo: () => noopChain,
+  manyToMany: () => noopChain,
+}
+
+export const MedusaService = (models: any) => {
+  return class {
+      constructor(container?: any) {
+          // Base constructor mock
+      }
+  }
+}

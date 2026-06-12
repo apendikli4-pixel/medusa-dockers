@@ -7,6 +7,13 @@ export type Message = {
     timestamp: Date
 }
 
+/**
+ * Güvenlik sabitleri — client-side savunma katmanı.
+ * Sunucu tarafında da aynı limitler mevcuttur (çift katmanlı koruma).
+ */
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB (sunucu 10MB kabul eder, client daha sıkı)
+const MESSAGE_COOLDOWN_MS = 2000 // Mesajlar arası minimum 2 saniye
+
 /** Mağaza config'i yüklenemezse kullanılacak nötr karşılama (sektör/mağaza adı içermez). */
 const NEUTRAL_GREETING = "Merhaba! Ben Ayna. Size nasıl yardımcı olabilirim?"
 
@@ -25,9 +32,11 @@ export function useAynaChat(greeting?: string) {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isOpen, setIsOpen] = useState(false)
+    const [cooldown, setCooldown] = useState(false)
     
     // Auto-scroll için ref
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const lastSendTime = useRef<number>(0)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -44,6 +53,16 @@ export function useAynaChat(greeting?: string) {
     const sendMessage = useCallback(async (content: string, imageBase64?: string) => {
         if (!content.trim() && !imageBase64) return
 
+        // Client-side rate limiting — 2 saniye cooldown
+        const now = Date.now()
+        if (now - lastSendTime.current < MESSAGE_COOLDOWN_MS) {
+            setError("Çok hızlı mesaj gönderiyorsunuz. Lütfen biraz bekleyin.")
+            return
+        }
+        lastSendTime.current = now
+        setCooldown(true)
+        setTimeout(() => setCooldown(false), MESSAGE_COOLDOWN_MS)
+
         const userMessage: Message = {
             id: Date.now().toString(),
             role: "user",
@@ -58,7 +77,13 @@ export function useAynaChat(greeting?: string) {
         try {
             const bodyPayload: any = { message: content }
             if (imageBase64) {
-                // Sadece data payload'ını gönder (örneğin "data:image/jpeg;base64,..." ise ayıklayıp gönderebiliriz, ancak backend direkt base64 alıyor)
+                // Dosya boyutu kontrolü (base64 encoded)
+                const sizeBytes = imageBase64.length * 0.75 // Base64 → byte yaklaşık
+                if (sizeBytes > MAX_IMAGE_SIZE_BYTES) {
+                    throw new Error(
+                        `Görsel çok büyük (${(sizeBytes / 1024 / 1024).toFixed(1)}MB). Lütfen 5MB'dan küçük bir görsel yükleyin.`
+                    )
+                }
                 const base64Data = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
                 bodyPayload.image = base64Data;
             }
@@ -88,7 +113,7 @@ export function useAynaChat(greeting?: string) {
             const errorMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: "Üzgünüm, şu an bağlantı sorunu yaşıyorum. Lütfen biraz sonra tekrar deneyin.",
+                content: err.message || "Üzgünüm, şu an bağlantı sorunu yaşıyorum. Lütfen biraz sonra tekrar deneyin.",
                 timestamp: new Date(),
             }
             setMessages(prev => [...prev, errorMessage])
@@ -111,6 +136,7 @@ export function useAynaChat(greeting?: string) {
         isLoading,
         error,
         isOpen,
+        cooldown,
         toggleChat,
         sendMessage,
         clearHistory,

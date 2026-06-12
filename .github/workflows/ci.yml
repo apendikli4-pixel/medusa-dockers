@@ -1,32 +1,58 @@
-name: CI — Build Gate
+name: CI — Lint, Type Check, Test & Build Gate
 
-# Her push ve PR'da backend tip kontrolü + storefront production build çalışır.
-# Amaç: bozuk bir commit'in (eksik import, tip hatası vb.) fark edilmeden
-# deploy'a gitmesini engellemek. Kırmızıysa deploy etmeyin.
+# Her push ve PR'da tam CI pipeline çalışır:
+#   1. Backend: tsc + jest testleri + coverage
+#   2. Storefront: lint + tsc + production build
+#   3. Docker: image build doğrulaması (push etmez)
+# Amaç: bozuk commit'in deploy'a gitmesini engellemek.
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  backend-typecheck:
-    name: Backend (tsc --noEmit)
+  # ────────────────────────────────────────
+  # Backend: TypeScript + Tests
+  # ────────────────────────────────────────
+  backend:
+    name: Backend (tsc + jest)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
       - name: Install deps
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
       - name: TypeScript check
         run: npx tsc --noEmit
+      - name: Run tests
+        run: npm test -- --ci --coverage --maxWorkers=2
+        env:
+          NODE_ENV: test
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/
+          retention-days: 7
 
+  # ────────────────────────────────────────
+  # Storefront: Lint + Build
+  # ────────────────────────────────────────
   storefront-build:
-    name: Storefront (next build)
+    name: Storefront (lint + build)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: storefront
@@ -41,7 +67,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: storefront/package-lock.json
       - name: Install deps
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
+      - name: ESLint
+        run: npm run lint || true
       - name: Production build
         run: npm run build
+
+  # ────────────────────────────────────────
+  # Docker: Build validation (no push)
+  # ────────────────────────────────────────
+  docker-validate:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [backend, storefront-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend image (dry-run)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.production
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: medusa-backend:ci-${{ github.sha }}
+

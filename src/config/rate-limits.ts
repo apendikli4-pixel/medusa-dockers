@@ -100,6 +100,33 @@ export const RATE_LIMITS = {
             message: "Arama limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.",
         },
     } as RateLimitGroup,
+
+    /**
+     * Global Gateway Limit - Müşteri (Store) API
+     * 100 requests per 1 minute per IP/Customer
+     */
+    globalStore: {
+        name: "Global Store API",
+        limit: {
+            maxRequests: 100,
+            windowMs: 60 * 1000, // 1 minute
+            message: "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.",
+        },
+    } as RateLimitGroup,
+
+    /**
+     * Global Gateway Limit - Admin API
+     * 300 requests per 1 minute per IP/Admin
+     */
+    globalAdmin: {
+        name: "Global Admin API",
+        limit: {
+            maxRequests: 300,
+            windowMs: 60 * 1000, // 1 minute
+            message: "API kullanım limiti aşıldı. Lütfen biraz bekleyip tekrar deneyin.",
+            skipOnWhitelist: true,
+        },
+    } as RateLimitGroup,
 } as const;
 
 /**

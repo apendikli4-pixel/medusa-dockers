@@ -5,8 +5,15 @@ import AynaMemoryService from "./memory-service"
 import AynaToolService from "./tool-service"
 import { HybridAIProviderService } from "./hybrid-ai.provider"
 import { SemanticCacheService, CacheType } from "../../../lib/cache/semantic-cache.service"
-// Import injection detector service
 import InjectionDetectorService from "../../../modules/conscience/services/injection-detector.service"
+import { SectorRegistry } from "../../../lib/sector-framework"
+
+/**
+ * Güvenlik sabitleri — function calling loop ve payload boyutu.
+ * Sonsuz döngü ve OOM saldırılarına karşı koruma.
+ */
+const MAX_TOOL_CALL_ITERATIONS = 3
+const MAX_IMAGE_PAYLOAD_BYTES = 10 * 1024 * 1024 // 10MB (base64 encoded)
 
 import { volumeCalculatorTool } from "../tools/volume-calculator-tool"
 import { productSearchTool } from "../tools/product-tool"
@@ -69,7 +76,8 @@ function getToolsForSector(sector: string, isAdmin: boolean) {
             quickOrderTool,
             productCreateTool,
             storeGeneratorTool,
-            createMissionTool
+            createMissionTool,
+            analyzeTrafficTool
         ]
     }
     
@@ -135,6 +143,16 @@ export default class AynaChatService {
         }
         
         const isAdmin = options.isAdmin || false
+
+        // ── IMAGE PAYLOAD BOYUT KONTROLÜ ──
+        // Base64 encoded 10MB'dan büyük görselleri reddet (OOM önlemi)
+        if (options.image && options.image.length > MAX_IMAGE_PAYLOAD_BYTES) {
+            this.logger_.warn(`[AynaChat] Image payload too large: ${(options.image.length / 1024 / 1024).toFixed(1)}MB (limit: ${MAX_IMAGE_PAYLOAD_BYTES / 1024 / 1024}MB)`)
+            return {
+                response: "Gönderdiğiniz görsel çok büyük. Lütfen 10MB'dan küçük bir görsel yükleyin.",
+                debug: { blocked: true, reason: "image_too_large" }
+            }
+        }
         
         let tenantContext = ""
         if (options.tenantId && options.remoteQuery) {
@@ -229,7 +247,30 @@ export default class AynaChatService {
         }
 
         // Create system prompt based on admin status
-        const systemPrompt = isAdmin ? ADMIN_SYSTEM_PROMPT : GUARDIAN_SYSTEM_PROMPT
+        let systemPrompt = isAdmin ? ADMIN_SYSTEM_PROMPT : GUARDIAN_SYSTEM_PROMPT
+        
+        // ── BUKALEMUN AI (CHAMELEON AI SWARM) KATMANI ──
+        // Sektöre göre AI'ın konuşma tonu, uzmanlık alanı ve içerik stili dinamik olarak enjekte edilir.
+        let sectorConfig: any = null
+        try {
+            if (SectorRegistry.isSupported(sector)) {
+                sectorConfig = SectorRegistry.get(sector)
+            }
+        } catch (e) {
+            this.logger_.warn(`[Chameleon AI] Sector fallback for: ${sector}`)
+        }
+        
+        if (sectorConfig?.aiBehavior) {
+            const { tone, expertise, contentStyle } = sectorConfig.aiBehavior
+            systemPrompt += `\n\n[SEKTÖR UZMANLIĞI (CHAMELEON AI)]
+Sen bir ${sector} uzmanısın.
+Uzmanlık alanların: ${expertise.join(", ")}.
+Konuşma tonun: ${tone}.
+İçerik stilin: ${contentStyle}.
+Bu kimliğin dışına çıkma ve bu uzmanlığa uygun yanıtlar ver.`
+        } else {
+            systemPrompt += `\n\n[SEKTÖR UZMANLIĞI]\n${tenantContext}`
+        }
 
         // ── DÜRÜSTLÜK KATMANI: ürün/fiyat/stok'ta modeli DB'ye ZORLA bağla ──
         // Müşteri mesajıyla DAİMA gerçek ürün araması yap (kelime eşleşmesi yoksa boş döner,
@@ -275,9 +316,17 @@ export default class AynaChatService {
         let toolUsed = false
 
         // 2. Tool Loop - Function Calling Execution
-        if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
+        // ── GÜVENLİK: Max iteration limiti — sonsuz döngü önlemi ──
+        // Model tekrar tekrar tool çağırabilir; bunu MAX_TOOL_CALL_ITERATIONS ile sınırlıyoruz.
+        let iteration = 0
+        while (
+            aiResponse.functionCalls &&
+            aiResponse.functionCalls.length > 0 &&
+            iteration < MAX_TOOL_CALL_ITERATIONS
+        ) {
+            iteration++
             toolUsed = true
-            this.logger_.info(`[AynaChat] Function calls detected: ${aiResponse.functionCalls.length}`)
+            this.logger_.info(`[AynaChat] Tool call iteration ${iteration}/${MAX_TOOL_CALL_ITERATIONS}: ${aiResponse.functionCalls.length} calls`)
             
             const toolResponses = []
             
@@ -287,33 +336,51 @@ export default class AynaChatService {
                 
                 this.logger_.info(`[AynaChat] Executing tool: ${toolName}`)
                 
-                const toolResult = await this.toolService_.handleToolCall(toolName, toolArgs, {
-                    isAdmin,
-                    tenantId: options.tenantId,
-                    remoteQuery: options.remoteQuery,
-                    remoteLink: options.remoteLink,
-                    productModuleService: options.productModuleService,
-                    inventoryService: options.inventoryService,
-                    stockLocationService: options.stockLocationService,
-                    pricingModuleService: options.pricingModuleService,
-                    salesChannelModuleService: options.salesChannelModuleService,
-                    contentEngineService: options.contentEngineService,
-                })
-                
-                toolResponses.push({
-                    name: toolName,
-                    result: toolResult
-                })
+                try {
+                    const toolResult = await this.toolService_.handleToolCall(toolName, toolArgs, {
+                        isAdmin,
+                        tenantId: options.tenantId,
+                        remoteQuery: options.remoteQuery,
+                        remoteLink: options.remoteLink,
+                        productModuleService: options.productModuleService,
+                        inventoryService: options.inventoryService,
+                        stockLocationService: options.stockLocationService,
+                        pricingModuleService: options.pricingModuleService,
+                        salesChannelModuleService: options.salesChannelModuleService,
+                        contentEngineService: options.contentEngineService,
+                    })
+                    
+                    toolResponses.push({
+                        name: toolName,
+                        result: toolResult
+                    })
+                } catch (toolError: any) {
+                    this.logger_.error(`[AynaChat] Tool execution failed: ${toolName} — ${toolError.message}`)
+                    toolResponses.push({
+                        name: toolName,
+                        result: { error: `Tool execution failed: ${toolError.message}` }
+                    })
+                }
             }
             
             const followUpPrompt = `${fullPrompt}\n\n[SYSTEM (INTERNAL): You called one or more tools. Here are the JSON results of those tool calls: ${JSON.stringify(toolResponses)}.\nNow, provide your final natural language response to the user based on these results. Yanıtı Türkçe ver. Yalnızca araç sonuçlarındaki gerçek verilere dayan; veri yoksa dürüstçe bilgi olmadığını söyle.]`
 
-            // Follow-up çağrısında araçları kapat — model sonucu yorumlayıp
-            // düz metin cevap üretsin, tekrar tool çağırmasın. Düşünme KAPALI (hız) +
-            // sistem talimatı zaten fullPrompt içinde olduğundan systemPrompt verilmez.
-            const followUpOptions = { ...genOptions, tools: undefined, think: false, systemPrompt: undefined }
+            // Son iterasyonda araçları kapat (yanıt üretmeli)
+            const isLastIteration = iteration >= MAX_TOOL_CALL_ITERATIONS
+            const followUpOptions = {
+                ...genOptions,
+                tools: isLastIteration ? undefined : genOptions.tools,
+                think: false,
+                systemPrompt: isLastIteration ? undefined : genOptions.systemPrompt,
+            }
             aiResponse = await this.hybridAIProvider_.generateText(followUpPrompt, followUpOptions)
             finalResponse = aiResponse.text || ""
+        }
+
+        if (iteration >= MAX_TOOL_CALL_ITERATIONS && aiResponse.functionCalls?.length) {
+            this.logger_.warn(
+                `[AynaChat] Max tool call iterations (${MAX_TOOL_CALL_ITERATIONS}) reached — forcing text response`
+            )
         }
 
         // 3. Record Truth

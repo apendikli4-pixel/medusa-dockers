@@ -32,6 +32,12 @@ export default function ChatWidget({ greeting }: { greeting?: string }) {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            // 5MB dosya boyutu limiti (client-side savunma)
+            if (file.size > 5 * 1024 * 1024) {
+                alert(`Görsel çok büyük (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen 5MB'dan küçük bir görsel seçin.`)
+                e.target.value = "" // Input'u temizle
+                return
+            }
             const reader = new FileReader()
             reader.onloadend = () => {
                 setSelectedImage(reader.result as string)

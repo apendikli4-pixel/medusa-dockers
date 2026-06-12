@@ -3,6 +3,9 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 /**
  * DELETE /store/wishlist/:itemId
  * Favori öğeyi kaldırır
+ *
+ * GÜVENLİK: Ownership kontrolü — müşteri yalnızca kendi wishlist
+ * öğesini silebilir. Başka müşterinin itemId'si ile çağrılırsa 404 döner.
  */
 export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
     try {
@@ -12,7 +15,25 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse) {
         }
 
         const { itemId } = req.params
+        if (!itemId || typeof itemId !== "string") {
+            return res.status(400).json({ error: "Geçersiz öğe ID'si." })
+        }
+
         const wishlistService = req.scope.resolve("wishlist") as any
+
+        // IDOR koruması: Önce öğenin varlığını ve sahipliğini doğrula
+        try {
+            const items = await wishlistService.listWishlistItems({
+                id: itemId,
+                customer_id: customerId,
+            })
+            if (!items || items.length === 0) {
+                return res.status(404).json({ error: "Favori öğe bulunamadı." })
+            }
+        } catch {
+            return res.status(404).json({ error: "Favori öğe bulunamadı." })
+        }
+
         const success = await wishlistService.removeCustomerWishlistItem(customerId, itemId)
 
         if (!success) {

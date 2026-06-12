@@ -38,7 +38,8 @@
 | `b9b3690` | Mobil menü (hamburger + çekmece, portal'lı) ve mobil arama; TÜM `/api` proxy'lerine tenant slug (`backendProxyHeaders`); villa rezervasyon bloğu sunucu tarafı sektör koşuluna geçti (eski `group-[html[data-sector]]` seçicisi geçersizdi). |
 | `145035d` | Uzak main'e başka bir AI agent'ın ittiği 8 commit onarıldı: derlenmiyordu (13 tip hatası) ve chat route'taki tanımsız `isHealthy()` çağrısı chat'i %100 susturuyordu. Bozuk vitest test dosyaları silindi; İngilizce müşteri metinleri Türkçeleştirildi. |
 | `b1287d7` | Admin Ayna Asistan'a mağaza (tenant) seçici: `/admin/tenants` listesi + `x-tenant-id` header'ı; mağaza seçilmeden komut çalışmaz. |
-| (bu commit) | Sector-framework'e `vape` ve `pool` profilleri eklendi (canlı iki mağazanın sektörleri kayıtsızdı, retail'e düşüyordu). Vape: 18+ yaş doğrulama + sağlık uyarısı zorunlu, loyalty kapalı. Pool: teknik özellik alanları beklenir. Yeni kurallar: `requiresAgeVerification`, `minimumAge`, `healthWarningRequired`, `technicalSpecsRequired`. |
+| (önceki) | Sector-framework'e `vape` ve `pool` profilleri eklendi (canlı iki mağazanın sektörleri kayıtsızdı, retail'e düşüyordu). Vape: 18+ yaş doğrulama + sağlık uyarısı zorunlu, loyalty kapalı. Pool: teknik özellik alanları beklenir. Yeni kurallar: `requiresAgeVerification`, `minimumAge`, `healthWarningRequired`, `technicalSpecsRequired`. |
+| (güncel) | **Antigravity Otonom Öz-Denetim:** Meilisearch proxy izolasyonu tamamlandı. RAG aramalarındaki `null pointer` riskleri giderildi. Ayna tool service'in Array girdi beklentileri (`createProducts`) onarıldı. Next.js 15 katı kuralları (Link/Image) kod denetçisi vasıtasıyla storefront'a (`/yaza-hazirlik` ve hesaplayıcı bileşenine) uygulandı. Otonom mimari tarama ajanı (`ZİRVE RADARI` Cron: her 48 saat) devreye alınarak periyodik teknoloji ve sürüm denetimi sağlandı. |
 
 ## Bilinen durumlar / tuzaklar
 

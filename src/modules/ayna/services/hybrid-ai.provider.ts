@@ -10,6 +10,13 @@
  *    uyumluluk için korundu; çağıran kod (chat-service, blog/generate) değişmedi.
  */
 import { Logger } from "@medusajs/framework/types"
+import {
+    getCircuitBreaker,
+    CircuitBreaker,
+    CircuitOpenError,
+    CircuitTimeoutError,
+} from "../../../lib/circuit-breaker"
+import { trace } from "@opentelemetry/api"
 
 // Node 20+ global fetch sağlıyor.
 const nodeFetch = globalThis.fetch
@@ -107,6 +114,7 @@ export class HybridAIProviderService {
     protected ollamaVisionModel: string
     protected embedModel: string
     protected logger: Logger
+    protected circuitBreaker_: CircuitBreaker
 
     constructor(logger: Logger) {
         this.logger = logger
@@ -116,17 +124,38 @@ export class HybridAIProviderService {
         // Görsel işleme için ayrı bir model kullanılabilir (örneğin llava veya llama3.2-vision)
         this.ollamaVisionModel = process.env.OLLAMA_VISION_MODEL || "llava"
         this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
-        // Sohbet için ayrı (daha hızlı) model: OLLAMA_CHAT_MODEL. Yoksa ana modele düşer.
-        // Sohbet interaktif olduğu için CPU sunucuda 7B tercih edilir; blog/içerik üretimi
-        // (ollama-client üzerinden) 14B kalitesinde kalır.
-        this.ollamaModel = process.env.OLLAMA_CHAT_MODEL || process.env.OLLAMA_MODEL_NAME || "qwen3.6:35b-a3b"
-        // Embedding için ayrı, hafif bir model kullanmak idealdir (nomic-embed-text).
-        // Yoksa ana modele düşer.
-        this.embedModel = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text"
+
+        // Circuit breaker: 5 ardışık hata → 30s OPEN → HALF_OPEN deneme
+        this.circuitBreaker_ = getCircuitBreaker("ollama", {
+            failureThreshold: parseInt(process.env.OLLAMA_CB_FAILURE_THRESHOLD || "5", 10),
+            resetTimeoutMs: parseInt(process.env.OLLAMA_CB_RESET_MS || "30000", 10),
+            requestTimeoutMs: parseInt(process.env.OLLAMA_TIMEOUT_MS || "290000", 10),
+            onStateChange: (from, to) => {
+                this.logger.warn(
+                    `[CircuitBreaker:ollama] ${from} → ${to} (failures: ${this.circuitBreaker_.metrics.consecutiveFailures})`
+                )
+            },
+        })
 
         this.logger.info(
             `AI Provider: Ollama (açık kaynak) — ${this.ollamaBaseUrl}, model: ${this.ollamaModel}, embed: ${this.embedModel}`
         )
+    }
+
+    /**
+     * Ollama sağlık kontrolü — circuit breaker durumunu döndürür.
+     * Route handler'ın checkOllamaHealth çağrısına yanıt verir.
+     */
+    isHealthy(): boolean {
+        return this.circuitBreaker_.isAvailable
+    }
+
+    /** Circuit breaker metrikleri (monitoring/admin endpoint için) */
+    getHealthMetrics() {
+        return {
+            circuitState: this.circuitBreaker_.state,
+            ...this.circuitBreaker_.metrics,
+        }
     }
 
     /**
@@ -227,49 +256,71 @@ export class HybridAIProviderService {
         const timer = setTimeout(() => controller.abort(), timeoutMs)
 
         try {
-            let response: Response
-            try {
-                response = await nodeFetch(`${this.ollamaBaseUrl}/api/chat`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
-                    signal: controller.signal,
+            // Circuit breaker koruması — Ollama down ise anında CircuitOpenError fırlatır
+            return await this.circuitBreaker_.execute(async () => {
+                // Trace span başlat (Jaeger üzerinde "Ollama Generation" olarak görünür)
+                const tracer = trace.getTracer("hybrid-ai-provider")
+                return tracer.startActiveSpan("Ollama Chat Generation", async (span) => {
+                    let response: Response
+                    try {
+                        span.setAttribute("ollama.model", body.model)
+                        span.setAttribute("ollama.stream", body.stream || false)
+
+                        response = await nodeFetch(`${this.ollamaBaseUrl}/api/chat`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(body),
+                            signal: controller.signal,
+                        })
+                    } finally {
+                        clearTimeout(timer)
+                    }
+
+                    if (!response.ok) {
+                        span.recordException(new Error(`API Error: ${response.status}`))
+                        span.setStatus({ code: 2, message: response.statusText }) // Error code 2
+                        span.end()
+                        throw new Error(`Ollama chat API error: ${response.status} ${response.statusText}`)
+                    }
+
+                    const result = (await response.json()) as OllamaChatResponse
+                    const promptTokens = result.prompt_eval_count || 0
+                    const completionTokens = result.eval_count || 0
+
+                    span.setAttribute("ollama.prompt_tokens", promptTokens)
+                    span.setAttribute("ollama.completion_tokens", completionTokens)
+                    span.end()
+
+                    const rawCalls = result.message?.tool_calls || []
+                    const functionCalls = rawCalls.map((tc) => ({
+                        name: tc.function?.name,
+                        args: tc.function?.arguments || {},
+                    })).filter((c) => !!c.name)
+
+                    return {
+                        text: result.message?.content || "",
+                        providerUsed: "ollama" as const,
+                        functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+                        metadata: {
+                            temperature,
+                            maxTokens,
+                            toolCount: tools.length,
+                            toolCallsReturned: functionCalls.length,
+                        },
+                        usage: {
+                            promptTokens,
+                            completionTokens,
+                            totalTokens: promptTokens + completionTokens,
+                        },
+                    }
                 })
-            } finally {
-                clearTimeout(timer)
-            }
-
-            if (!response.ok) {
-                throw new Error(`Ollama chat API error: ${response.status} ${response.statusText}`)
-            }
-
-            const result = (await response.json()) as OllamaChatResponse
-            const promptTokens = result.prompt_eval_count || 0
-            const completionTokens = result.eval_count || 0
-
-            const rawCalls = result.message?.tool_calls || []
-            const functionCalls = rawCalls.map((tc) => ({
-                name: tc.function?.name,
-                args: tc.function?.arguments || {},
-            })).filter((c) => !!c.name)
-
-            return {
-                text: result.message?.content || "",
-                providerUsed: "ollama",
-                functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
-                metadata: {
-                    temperature,
-                    maxTokens,
-                    toolCount: tools.length,
-                    toolCallsReturned: functionCalls.length,
-                },
-                usage: {
-                    promptTokens,
-                    completionTokens,
-                    totalTokens: promptTokens + completionTokens,
-                },
-            }
+            })
         } catch (error: any) {
+            // Circuit breaker OPEN → anında fallback
+            if (error instanceof CircuitOpenError) {
+                this.logger.warn(`AI Provider: Circuit breaker OPEN — düz metin denemesi atlanıyor`)
+                throw error // Üst katman (route handler) fallback gösterir
+            }
             this.logger.error(`AI Provider: Ollama chat (tools) hatası: ${error.message}`)
             // Tool çağrısı başarısız olursa düz metin üretimine düş (graceful degradation)
             this.logger.warn("AI Provider: tool çağrısı başarısız, düz metin üretimine düşülüyor")
@@ -313,42 +364,57 @@ export class HybridAIProviderService {
         const timer = setTimeout(() => controller.abort(), timeoutMs)
 
         try {
-            let response: Response
-            try {
-                response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(ollamaOptions),
-                    signal: controller.signal,
+            // Circuit breaker koruması
+            return await this.circuitBreaker_.execute(async () => {
+                const tracer = trace.getTracer("hybrid-ai-provider")
+                return tracer.startActiveSpan("Ollama Text Generation", async (span) => {
+                    let response: Response
+                    try {
+                        span.setAttribute("ollama.model", ollamaOptions.model)
+
+                        response = await nodeFetch(`${this.ollamaBaseUrl}/api/generate`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(ollamaOptions),
+                            signal: controller.signal,
+                        })
+                    } finally {
+                        clearTimeout(timer)
+                    }
+
+                    if (!response.ok) {
+                        span.recordException(new Error(`API Error: ${response.status}`))
+                        span.setStatus({ code: 2 })
+                        span.end()
+                        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
+                    }
+
+                    const result = (await response.json()) as OllamaGenerateResponse
+                    const promptTokens = result.prompt_eval_count || 0
+                    const completionTokens = result.eval_count || 0
+
+                    span.setAttribute("ollama.prompt_tokens", promptTokens)
+                    span.setAttribute("ollama.completion_tokens", completionTokens)
+                    span.end()
+
+                    return {
+                        text: result.response,
+                        providerUsed: "ollama" as const,
+                        metadata: {
+                            temperature,
+                            maxTokens,
+                            responseFormat,
+                            ollamaEvalCount: completionTokens,
+                            ollamaPromptEvalCount: promptTokens,
+                        },
+                        usage: {
+                            promptTokens,
+                            completionTokens,
+                            totalTokens: promptTokens + completionTokens,
+                        },
+                    }
                 })
-            } finally {
-                clearTimeout(timer)
-            }
-
-            if (!response.ok) {
-                throw new Error(`Ollama API error: ${response.status} ${response.statusText}`)
-            }
-
-            const result = (await response.json()) as OllamaGenerateResponse
-            const promptTokens = result.prompt_eval_count || 0
-            const completionTokens = result.eval_count || 0
-
-            return {
-                text: result.response,
-                providerUsed: "ollama",
-                metadata: {
-                    temperature,
-                    maxTokens,
-                    responseFormat,
-                    ollamaEvalCount: completionTokens,
-                    ollamaPromptEvalCount: promptTokens,
-                },
-                usage: {
-                    promptTokens,
-                    completionTokens,
-                    totalTokens: promptTokens + completionTokens,
-                },
-            }
+            })
         } catch (error: any) {
             this.logger.error(`AI Provider: Ollama üretim hatası: ${error.message}`)
             throw new Error(`Ollama yanıt veremedi: ${error.message}`)

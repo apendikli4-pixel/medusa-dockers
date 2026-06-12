@@ -48,6 +48,7 @@ export default class AynaService extends MedusaService({
             aynaDiagnosticService: this.diagnosticService_,
             aynaStockIntelligenceService: this.stockIntelligenceService_,
             aynaService: this,
+            container: container as any
         })
         const injectionDetector = new InjectionDetectorService({ logger: container.logger })
         this.chatService_ = new AynaChatService({

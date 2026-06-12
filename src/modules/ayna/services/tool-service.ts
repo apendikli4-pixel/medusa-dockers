@@ -1,5 +1,6 @@
 import { Logger, RemoteQueryFunction } from "@medusajs/framework/types"
 import { Modules } from "@medusajs/framework/utils"
+import { randomBytes } from "crypto"
 import { ollamaGenerate } from "../../../lib/ollama-client"
 import AynaMemoryService from "./memory-service"
 import AynaDiagnosticService from "./diagnostic-service"
@@ -11,6 +12,44 @@ type InjectedDependencies = {
     aynaDiagnosticService: AynaDiagnosticService
     aynaStockIntelligenceService: AynaStockIntelligenceService
     aynaService?: any
+    container?: any
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RAG VEKTÖR DEPOSU — MODÜL DÜZEYİNDE SINGLETON
+// Her ürün aramasında PGVectorStore.initialize() çağrılırsa her istek YENİ bir
+// PG bağlantı havuzu açar → dürüstlük katmanı her müşteri mesajında arama
+// yaptığından bağlantı tükenir (connection exhaustion). Burada tek sefer kurulur,
+// tüm aramalar paylaşır. Init başarısız olursa cache temizlenir (sonraki çağrı yeniden dener).
+// ─────────────────────────────────────────────────────────────────────────
+let aynaVectorStorePromise: Promise<any> | null = null
+async function getAynaVectorStore(): Promise<any> {
+    if (aynaVectorStorePromise) return aynaVectorStorePromise
+    aynaVectorStorePromise = (async () => {
+        const { PGVectorStore } = await import("@langchain/community/vectorstores/pgvector")
+        const { Embeddings } = await import("@langchain/core/embeddings")
+        const { ollamaEmbed } = await import("../../../lib/ollama-client.js")
+
+        class OllamaEmbeddings extends Embeddings {
+            constructor() { super({}) }
+            async embedQuery(text: string): Promise<number[]> { return ollamaEmbed(text) }
+            async embedDocuments(texts: string[]): Promise<number[][]> {
+                const out: number[][] = []
+                for (const t of texts) out.push(await ollamaEmbed(t))
+                return out
+            }
+        }
+
+        const config = {
+            postgresConnectionOptions: { connectionString: process.env.DATABASE_URL, ssl: false } as any,
+            tableName: "langchain_pg_embedding",
+            columns: { idColumnName: "id", vectorColumnName: "embedding", contentColumnName: "text", metadataColumnName: "metadata" },
+        }
+        return PGVectorStore.initialize(new OllamaEmbeddings(), config)
+    })()
+    // Init patlarsa cache'i temizle ki sonraki çağrı tekrar deneyebilsin.
+    aynaVectorStorePromise.catch(() => { aynaVectorStorePromise = null })
+    return aynaVectorStorePromise
 }
 
 export default class AynaToolService {
@@ -19,13 +58,15 @@ export default class AynaToolService {
     protected diagnosticService_: AynaDiagnosticService
     protected stockIntelligenceService_: AynaStockIntelligenceService
     protected aynaService_: any
+    protected container_: any
 
-    constructor({ logger, aynaMemoryService, aynaDiagnosticService, aynaStockIntelligenceService, aynaService }: InjectedDependencies) {
+    constructor({ logger, aynaMemoryService, aynaDiagnosticService, aynaStockIntelligenceService, aynaService, container }: InjectedDependencies) {
         this.logger_ = logger
         this.memoryService_ = aynaMemoryService
         this.diagnosticService_ = aynaDiagnosticService
         this.stockIntelligenceService_ = aynaStockIntelligenceService
         this.aynaService_ = aynaService
+        this.container_ = container
     }
 
     async handleToolCall(
@@ -126,35 +167,60 @@ export default class AynaToolService {
         const limit = args.limit || 5
         const q = args.query
 
-        // Sorguyu anlamlı kelimelere ayır (Türkçe sadeleştirme + stopword temizliği).
-        // Böylece "havuzum için klor lazım" gibi cümleler de ürün başlığıyla eşleşir.
+        let vectorProductIds: string[] = []
+        let vectorSearchUsed = false
+
+        // ─── RAG (VEKTÖR ARAMA) — VARSAYILAN KAPALI ───
+        // Açmadan ÖNCE iki ön koşul gerekir, yoksa dürüstlük/izolasyon zedelenir:
+        //   1) Vektör metadata'sına sales_channel_ids eklenmeli (tenant izolasyonu
+        //      vektör katmanında yapılmalı; şu an yalnızca sonradan kırpılıyor → çoklu
+        //      mağazada doğru ürünler aday penceresinin dışında kalıp elenebilir).
+        //   2) Tüm katalog yeniden indekslenmeli (mevcut vektörlerde bu metadata yok).
+        // Bunlar tamamlanana dek KANITLANMIŞ kelime-bazlı arama (tenant-izole) varsayılan
+        // kalır. Açmak için: AYNA_RAG_SEARCH=true (yalnızca re-index sonrası).
+        if (process.env.AYNA_RAG_SEARCH === "true" && process.env.DATABASE_URL) {
+            try {
+                const vectorStore = await getAynaVectorStore()
+                const results = await vectorStore.similaritySearch(q, limit * 3)
+                if (results && results.length > 0) {
+                    vectorProductIds = [...new Set(results.map((r: any) => r.metadata?.product_id).filter(Boolean) as string[])]
+                    // Yalnızca gerçekten ID bulunduysa vektör yolunu kullan.
+                    vectorSearchUsed = vectorProductIds.length > 0
+                    if (vectorSearchUsed) {
+                        this.logger_.info(`[AynaTool] Vektör araması: "${q}" -> ${vectorProductIds.length} aday.`)
+                    }
+                }
+                // DÜRÜSTLÜK: Vektör 0 sonuç dönerse "ürün yok" DEMEYİZ. vectorSearchUsed
+                // false kalır → kelime-bazlı aramaya düşülür (gerçek katalogda eşleşme olabilir).
+            } catch (error: any) {
+                this.logger_.warn(`[AynaTool] Vektör araması başarısız, kelime-bazlı aramaya düşülüyor: ${error.message}`)
+            }
+        }
+        // ─── RAG SONU ───
+
+        // Fallback için kelime ayıklama
         const STOP = new Set(["için","ile","var","mı","mi","mu","mü","ne","kadar","kaç","kaca","kaçtan","fiyat","fiyatı","fiyati","ucret","ücret","ücreti","stok","stokta","mevcut","acaba","lazım","lazim","istiyorum","almak","alabilir","satıyor","satiyor","misiniz","musunuz","güncel","guncel","nedir","bir","bana","sizde","sizin","urun","ürün","ürünü","tl","lira","adet","kg"])
+        const charMap: Record<string, string> = { ç:"c", ğ:"g", ı:"i", ö:"o", ş:"s", ü:"u" }
         const tokenize = (s: string): string[] => {
-            const map: Record<string, string> = { ç:"c", ğ:"g", ı:"i", ö:"o", ş:"s", ü:"u" }
             return (s || "")
                 .toLowerCase()
                 .split(/[^a-zçğıöşü0-9]+/i)
-                .map(w => w.split("").map(c => map[c] ?? c).join(""))
+                .map(w => w.split("").map(c => charMap[c] ?? c).join(""))
                 .filter(w => w.length >= 3 && !STOP.has(w))
         }
         const tokens = tokenize(q)
         const norm = (s: string) => (s || "").toLowerCase().split("").map(c => (({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"} as Record<string,string>)[c] ?? c)).join("")
-        // Bir ürünün sorguyla eşleşme puanı: kaç token başlık/açıklamada geçiyor.
         const scoreOf = (p: any): number => {
-            if (tokens.length === 0) return 1 // sorgu yoksa hepsi geçerli (genel liste)
+            if (tokens.length === 0) return 1
             const hay = norm(`${p?.title || ""} ${p?.description || ""}`)
             return tokens.reduce((acc, t) => acc + (hay.includes(t) ? 1 : 0), 0)
         }
 
-        // Bir ürün listesini fiyatla birlikte sade forma indirger.
-        // Fiyat varyantın price_set.prices içinden TRY olanından alınır.
         const simplify = (products: any[]) =>
             (products || []).map((p: any) => {
                 const variants = p?.variants || []
                 const prices = variants?.[0]?.price_set?.prices || []
                 const tryPrice = prices.find((pr: any) => pr.currency_code === "try")
-                // Stok durumu: Bir varyant stok takibi yapmıyorsa (manage_inventory=false)
-                // ürün her zaman satılabilir → stokta. Takip ediyorsa miktar > 0 ise stokta.
                 const inStock = variants.some((v: any) =>
                     v?.manage_inventory === false ||
                     (typeof v?.inventory_quantity === "number" && v.inventory_quantity > 0)
@@ -172,12 +238,7 @@ export default class AynaToolService {
             })
 
         try {
-            // Birincil yol: remoteQuery ile ürünleri FİYATLARIYLA çek.
             if (remoteQuery) {
-                // ── ÇOKLU MAĞAZA İZOLASYONU ──
-                // Aktif tenant'ın sales-channel'ını çöz. Çözülürse arama SADECE o
-                // mağazanın ürünlerini döndürür (vape mağazasında havuz ürünü çıkmaz).
-                // Çözülemezse (tek-tenant/default kurulum) tüm ürünler — geriye uyumlu.
                 let tenantScId: string | null = null
                 let multiTenant = false
                 if (tenantId) {
@@ -188,24 +249,22 @@ export default class AynaToolService {
                             filters: { id: tenantId },
                         })
                         tenantScId = tdata?.[0]?.sales_channel?.id || null
-                        // Birden fazla mağaza var mı? (izolasyon yalnızca o zaman gerekir)
                         const { data: tall } = await (remoteQuery as any).graph({
                             entity: "tenant", fields: ["id"], pagination: { take: 2 },
                         })
                         multiTenant = (tall?.length || 0) > 1
-                    } catch { /* çözülemezse global davranış */ }
+                    } catch { /* ignore */ }
                 }
-                // İzolasyon VARSAYILAN AÇIK: vitrin/sepet zaten kanal-bazlı izole;
-                // AI araması açık kalırsa Vozol chat'i Aqua ürünü önerir (çapraz sızıntı).
-                // Acil durum kaçışı: TENANT_PRODUCT_ISOLATION=false (kanal bağları
-                // bozulursa ürünler "yok" görünmesin diye kapatma anahtarı korunur).
-                // Ek güvence: multiTenant && tenantScId çözülmüş olmalı — tek mağazada
-                // veya kanal çözülemezse filtre uygulanmaz (fail-open, dürüstlük korunur).
                 const isolationEnabled = process.env.TENANT_PRODUCT_ISOLATION !== "false"
                 const enforceIsolation = isolationEnabled && multiTenant && !!tenantScId
 
-                // Yayındaki ürünleri geniş çek (başlık filtresi YOK), sonra kelime-bazlı
-                // JS eşleştirmesiyle ele. Küçük/orta katalogda en güvenilir yol.
+                // Vektör araması ID bulduysa sorguyu o ID'lerle sınırla.
+                // (vectorSearchUsed yalnızca ID varsa true; 0 sonuç → kelime-bazlı yola düşer.)
+                const queryFilters: any = { status: "published" }
+                if (vectorSearchUsed && vectorProductIds.length > 0) {
+                    queryFilters.id = vectorProductIds
+                }
+
                 const { data: allProducts } = await (remoteQuery as any).graph({
                     entity: "product",
                     fields: [
@@ -216,38 +275,47 @@ export default class AynaToolService {
                         "variants.price_set.prices.amount",
                         "variants.price_set.prices.currency_code",
                     ],
-                    filters: { status: "published" },
-                    pagination: { take: 200 },
+                    filters: queryFilters,
+                    pagination: { take: vectorSearchUsed ? limit * 3 : 200 },
                 })
-                // Sales-channel'a göre kapsamla (çoklu mağaza + kanal çözüldüyse).
+
                 const scoped = enforceIsolation
                     ? (allProducts || []).filter((p: any) =>
                         Array.isArray(p?.sales_channels) &&
                         p.sales_channels.some((sc: any) => sc?.id === tenantScId))
                     : (allProducts || [])
-                const ranked = scoped
-                    .map((p: any) => ({ p, s: scoreOf(p) }))
-                    .filter((x: any) => x.s > 0)
-                    .sort((a: any, b: any) => b.s - a.s)
-                    .slice(0, limit)
-                    .map((x: any) => x.p)
+
+                let ranked = []
+                if (vectorSearchUsed) {
+                    // Vektör sonuçları zaten en ilgiliye göre sıralıdır, sadece scope limitini uygula
+                    ranked = scoped.slice(0, limit)
+                } else {
+                    // Fallback (eski kelime eşleştirme)
+                    ranked = scoped
+                        .map((p: any) => ({ p, s: scoreOf(p) }))
+                        .filter((x: any) => x.s > 0)
+                        .sort((a: any, b: any) => b.s - a.s)
+                        .slice(0, limit)
+                        .map((x: any) => x.p)
+                }
+
                 const simplified = simplify(ranked)
                 await this.memoryService_.recordTruth("system", "product_search", {
-                    query: q, tokens, resultCount: simplified.length,
-                    tenantId: tenantId || null, salesChannelId: tenantScId,
+                    query: q, 
+                    tokens: vectorSearchUsed ? ["vector_search_applied"] : tokens, 
+                    resultCount: simplified.length,
+                    tenantId: tenantId || null, 
+                    salesChannelId: tenantScId,
+                    method: vectorSearchUsed ? "rag_vector" : "keyword_fallback"
                 })
-                return { products: simplified, count: simplified.length }
+                return { products: simplified, count: simplified.length, method: vectorSearchUsed ? "rag" : "keyword" }
             }
 
-            // Yedek yol: productModuleService (fiyatsız — son çare).
             if (productModuleService) {
                 const products = await productModuleService.listProducts(
                     q ? { q } : {},
                     { take: limit, select: ["id", "title", "handle", "status", "description"] }
                 )
-                await this.memoryService_.recordTruth("system", "product_search", {
-                    query: q, resultCount: products.length, tenantId: tenantId || null,
-                })
                 return { products, count: products.length, note: "Fiyat bilgisi alınamadı (query service yok)." }
             }
 
@@ -456,13 +524,13 @@ export default class AynaToolService {
 
             const handle = args.handle || args.title.toLowerCase().replace(/[^a-z0-9]/g, "-") + `-${Date.now().toString().slice(-4)}`
 
-            const product = await services.productModuleService.createProducts({
+            const [product] = await services.productModuleService.createProducts([{
                 title: args.title,
                 handle,
                 description: args.description || "",
                 status: "published",
                 categories: args.categories?.map((id: string) => ({ id })) || [],
-            })
+            }])
 
             // Fiyat ekleme
             if (args.price && services.pricingModuleService) {
@@ -514,13 +582,13 @@ export default class AynaToolService {
             if (!services.productModuleService) return { error: "Product service unavailable" }
 
             const handle = args.handle || args.name.toLowerCase().replace(/[^a-z0-9]/g, "-")
-            const category = await services.productModuleService.createProductCategories({
+            const [category] = await services.productModuleService.createProductCategories([{
                 name: args.name,
                 handle,
                 description: args.description || "",
                 is_active: true,
                 is_internal: false,
-            })
+            }])
 
             await this.memoryService_.recordTruth("admin", "category_created", {
                 categoryId: category.id,
@@ -725,24 +793,97 @@ export default class AynaToolService {
 
     /**
      * Auto-store generator — Toplu mağaza verisi oluşturur.
-     * Çakışma düzeltmesi: tenantId iletilerek ürünler otomatik bağlanır.
+     * Çakışma düzeltmesi: tenantId iletilerek ürünler otomatik bağlanır ve yeni tenant yönetimi eklenir.
      */
     private async executeStoreGenerator(args: Record<string, any>, services: any) {
         try {
-            const { autoStoreGeneratorWorkflow } = await import("../../../workflows/auto-store-generator.js")
+            if (!this.container_) {
+                return { error: "Medusa container bulunamadığı için workflow tetiklenemiyor." }
+            }
 
-            // Not: Workflow container'a ihtiyaç duyar, burada doğrudan çalıştırılamaz.
-            // Bu tool admin chat üzerinden çağrılır ve chat route'unda container mevcuttur.
+            let targetTenantId = services.tenantId;
+            let targetSalesChannelId: string | undefined = undefined;
+
+            // 1. Tenant ID yoksa (SüperAdmin), yeni Tenant Yarat
+            let generatedAdminPassword: string | null = null
+            if (!targetTenantId) {
+                const { createTenantProvisioningWorkflow } = await import("../../../workflows/create-tenant.js")
+
+                // GÜVENLİK: Sabit/zayıf parola YASAK. E-posta gerçek olmalı; verilmezse
+                // sessizce admin@example.com yaratmak yerine işlemi durdur.
+                const adminEmail = (args.admin_email || "").trim()
+                if (!adminEmail || !adminEmail.includes("@")) {
+                    return { error: "Yeni mağaza için geçerli bir yönetici e-postası (admin_email) zorunludur." }
+                }
+                // Parola verilmediyse kriptografik olarak güçlü, rastgele bir parola üret.
+                // ("Password123!" gibi tahmin edilebilir sabit parola asla kullanılmaz.)
+                const adminPassword = (typeof args.admin_password === "string" && args.admin_password.length >= 12)
+                    ? args.admin_password
+                    : randomBytes(18).toString("base64url")
+                if (!args.admin_password) generatedAdminPassword = adminPassword
+
+                const tenantInput = {
+                    name: args.concept_name,
+                    slug: args.concept_name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+                    sector: args.sector || "retail",
+                    admin_email: adminEmail,
+                    admin_password: adminPassword
+                }
+
+                const { result: tenantResult } = await createTenantProvisioningWorkflow(this.container_).run({
+                    input: tenantInput
+                })
+
+                targetTenantId = tenantResult.tenant_id
+                targetSalesChannelId = tenantResult.sales_channel_id
+            } else {
+                // 2. Mevcut Tenant'ın Sales Channel'ını bul
+                if (services.remoteQuery) {
+                    const { data } = await services.remoteQuery.graph({
+                        entity: "tenant",
+                        fields: ["sales_channel.*"],
+                        filters: { id: targetTenantId }
+                    });
+                    if (data && data.length > 0 && data[0].sales_channel) {
+                        targetSalesChannelId = data[0].sales_channel.id;
+                    }
+                }
+            }
+
+            // 3. Mağaza içeriğini oluştur (Kategori, Ürün, Blog)
+            const { autoStoreGeneratorWorkflow } = await import("../../../workflows/auto-store-generator.js")
+            const { result } = await autoStoreGeneratorWorkflow(this.container_).run({
+                input: {
+                    concept_name: args.concept_name,
+                    categories: args.categories || [],
+                    products: args.products || [],
+                    blog_post: args.blog_post || { title: `Hoş Geldiniz: ${args.concept_name}`, content: "Mağazamız çok yakında hizmetinizde." },
+                    sales_channel_id: targetSalesChannelId
+                }
+            })
+
+            // 4. Hafızaya kaydet
+            await this.memoryService_.recordTruth("admin", "auto_store_generated", {
+                concept_name: args.concept_name,
+                tenant_id: targetTenantId,
+                sales_channel_id: targetSalesChannelId,
+                products_created: result.productsCreated
+            })
+
             return {
                 success: true,
-                message: `"${args.concept_name}" mağaza altyapısı hazırlanıyor. ` +
-                    `${args.categories?.length || 0} kategori, ${args.products?.length || 0} ürün oluşturulacak.`,
-                tenantId: services.tenantId || null,
-                note: services.tenantId
-                    ? "Ürünler otomatik olarak mağazanıza bağlanacaktır."
-                    : "tenant_id belirtilmedi — ürünler herhangi bir mağazaya bağlanmayacak.",
+                message: `"${args.concept_name}" mağaza altyapısı başarıyla kuruldu. ` +
+                    `${result.categoriesCreated} kategori, ${result.productsCreated} ürün oluşturuldu.` +
+                    (generatedAdminPassword
+                        ? ` Yönetici hesabı için GÜÇLÜ rastgele bir parola üretildi (aşağıda). Bu parolayı şimdi kaydedin; tekrar gösterilmeyecek ve ilk girişten sonra değiştirin.`
+                        : ""),
+                tenantId: targetTenantId,
+                salesChannelId: targetSalesChannelId,
+                // Yalnızca parola otomatik üretildiyse döndürülür (operatöre tek seferlik).
+                ...(generatedAdminPassword ? { generatedAdminPassword } : {}),
             }
         } catch (e: any) {
+            this.logger_.error(`[AynaTool] Store Generator hatası: ${e.message}`, e)
             return { error: `Mağaza oluşturma hatası: ${e.message}` }
         }
     }

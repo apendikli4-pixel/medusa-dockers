@@ -10,6 +10,10 @@ export const storeGeneratorTool = {
                 type: SchemaType.STRING,
                 description: "Oluşturulan mağazanın veya konseptin genel adı (örn: Kışlık Havuz Ürünleri)"
             },
+            sector: {
+                type: SchemaType.STRING,
+                description: "Mağazanın ait olduğu sektör (örn: retail, pool, vape, fashion, horeca, b2b)"
+            },
             categories: {
                 type: SchemaType.ARRAY,
                 description: "Oluşturulacak kategorilerin listesi",

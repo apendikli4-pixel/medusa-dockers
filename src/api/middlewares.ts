@@ -13,6 +13,7 @@ import { tenantAlsMiddleware } from "./middlewares/tenant-als"
 import { tenantDbGuardMiddleware } from "./middlewares/tenant-db-guard"
 import { storefrontTenantScoper } from "./middlewares/storefront-tenant-scoper"
 import { adminTenantRbac } from "./middlewares/admin-tenant-rbac"
+import { globalRateLimiterMiddleware } from "./middlewares/global-rate-limiter"
 
 // Rate Limiter temizleyiciyi başlat (Memory Leak önlemi)
 startRateLimitCleanup(60000)
@@ -42,15 +43,15 @@ startRateLimitCleanup(60000)
 export default defineMiddlewares({
     routes: [
         // ─── TENANT İZOLASYON ZİNCİRİ ───
-        // Sıra: Context → ALS → DB Guard → Scoper
+        // Sıra: Gateway Rate Limiter → Context → ALS → DB Guard → Scoper
         // Auth'dan ÖNCE çalışır. Tenant çözümlenemezse istek bloke edilir.
         {
             matcher: "/store/*",
-            middlewares: [tenantContextMiddleware, tenantAlsMiddleware, tenantDbGuardMiddleware, storefrontTenantScoper],
+            middlewares: [globalRateLimiterMiddleware, tenantContextMiddleware, tenantAlsMiddleware, tenantDbGuardMiddleware, storefrontTenantScoper],
         },
         {
             matcher: "/admin/*",
-            middlewares: [tenantContextMiddleware, tenantAlsMiddleware, tenantDbGuardMiddleware],
+            middlewares: [globalRateLimiterMiddleware, tenantContextMiddleware, tenantAlsMiddleware, tenantDbGuardMiddleware],
         },
         // ─── ADMIN RBAC KORUMASI ───
         // NOT: Medusa V2 /admin/* için built-in authenticate guard zaten

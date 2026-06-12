@@ -12,6 +12,7 @@ type StoreGeneratorInput = {
     categories: { name: string; description: string }[]
     products: { title: string; description: string; category_name: string; price: number }[]
     blog_post: { title: string; content: string }
+    sales_channel_id?: string
 }
 
 // =============================================================================
@@ -52,19 +53,23 @@ const createStoreCategoriesStep = createStep(
 // =============================================================================
 const createStoreProductsStep = createStep(
     "create-store-products",
-    async (input: { products: any[], categoryMap: { name: string, id: string }[] }, { container }) => {
+    async (input: { products: any[], categoryMap: { name: string, id: string }[], sales_channel_id?: string }, { container }) => {
         const productModule = container.resolve(Modules.PRODUCT) as any
         const salesChannelModule = container.resolve(Modules.SALES_CHANNEL) as any
         const pricingModule = container.resolve(Modules.PRICING) as any
         
         // Satış kanalını bul
         let salesChannels: { id: string }[] = []
-        try {
-            if (salesChannelModule) {
-                const [defaultChannel] = await salesChannelModule.listSalesChannels({}, { take: 1 })
-                if (defaultChannel) salesChannels = [{ id: defaultChannel.id }]
-            }
-        } catch (e) {}
+        if (input.sales_channel_id) {
+            salesChannels = [{ id: input.sales_channel_id }]
+        } else {
+            try {
+                if (salesChannelModule) {
+                    const [defaultChannel] = await salesChannelModule.listSalesChannels({}, { take: 1 })
+                    if (defaultChannel) salesChannels = [{ id: defaultChannel.id }]
+                }
+            } catch (e) {}
+        }
 
         const createdProductIds = []
         
@@ -156,8 +161,12 @@ export const autoStoreGeneratorWorkflow = createWorkflow(
         // 1. Kategoriler oluşturulur, ID'ler alınır
         const categoryMap = createStoreCategoriesStep({ categories: input.categories })
         
-        // 2. Ürünler ait oldukları kategori ID'si ile oluşturulur
-        const products = createStoreProductsStep({ products: input.products, categoryMap })
+        // 2. Ürünler ait oldukları kategori ID'si ve satış kanalı ile oluşturulur
+        const products = createStoreProductsStep({ 
+            products: input.products, 
+            categoryMap,
+            sales_channel_id: input.sales_channel_id 
+        })
         
         // 3. Blog yayına alınır
         const blogPost = createStoreBlogStep({ blog_post: input.blog_post, concept_name: input.concept_name })
