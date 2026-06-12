@@ -6,7 +6,7 @@
  *
  *   import "./lib/sector-framework/sectors"
  *
- * çağrıldığında 4 sektör de kayıt defterine eklenmiş olur.
+ * çağrıldığında 6 sektör de kayıt defterine eklenmiş olur.
  *
  * Yeni sektör eklemek için:
  *   1. sectors/<yeni-sektor>.ts dosyasını oluştur
@@ -19,3 +19,5 @@ import "./retail"
 import "./horeca"
 import "./b2b"
 import "./fashion"
+import "./vape"
+import "./pool"

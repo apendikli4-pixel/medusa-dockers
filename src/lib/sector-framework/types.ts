@@ -28,7 +28,7 @@
  * VALID_SECTORS sabit dizisini ikisini de güncelleyin (kompile zamanı
  * kontrolü için tip ve runtime kontrolü için sabit dizi ayrı yerlerde).
  */
-export const SECTOR_CODES = ["retail", "horeca", "b2b", "fashion"] as const
+export const SECTOR_CODES = ["retail", "horeca", "b2b", "fashion", "vape", "pool"] as const
 export type SectorCode = typeof SECTOR_CODES[number]
 
 // ─── KURAL TANIMLARI ───────────────────────────────────────────────
@@ -91,6 +91,32 @@ export interface SectorRules {
      * B2B ve HORECA için tipik olarak true.
      */
     bulkPricingEnabled?: boolean
+
+    /**
+     * Yaş doğrulama kapısı (Age Gate) zorunlu mu? (VAPE)
+     * Storefront AgeGate bileşeni ve sipariş akışı bu bayrağı okur.
+     * Yasal gereklilik — tenant.settings ile KAPATILAMAZ (override edilemez).
+     */
+    requiresAgeVerification?: boolean
+
+    /**
+     * requiresAgeVerification aktifken geçerli minimum yaş.
+     * Türkiye'de tütün/elektronik sigara için 18.
+     */
+    minimumAge?: number
+
+    /**
+     * Ürün sayfalarında yasal sağlık uyarısı bandı zorunlu mu? (VAPE)
+     * Dürüstlük ilkesi + 4207 sayılı kanun gereği.
+     */
+    healthWarningRequired?: boolean
+
+    /**
+     * Teknik özellik alanları (debi, güç, hacim vb.) ürün içeriğinde
+     * beklenir mi? (POOL) İçerik üretiminde AI bu alanları doldurmaya
+     * öncelik verir; UI teknik tablo bölümünü gösterir.
+     */
+    technicalSpecsRequired?: boolean
 }
 
 // ─── AI DAVRANIŞ TANIMLARI ─────────────────────────────────────────

@@ -14,9 +14,9 @@ import {
 } from "../sector-framework"
 
 describe("SectorRegistry", () => {
-    it("4 varsayılan sektörü kayıt eder (retail, horeca, b2b, fashion)", () => {
+    it("6 varsayılan sektörü kayıt eder (retail, horeca, b2b, fashion, vape, pool)", () => {
         expect(SectorRegistry.listCodes().sort()).toEqual(
-            ["retail", "horeca", "b2b", "fashion"].sort()
+            ["retail", "horeca", "b2b", "fashion", "vape", "pool"].sort()
         )
     })
 
@@ -44,9 +44,40 @@ describe("SectorRegistry", () => {
 
     it("list() tüm konfigürasyonları döndürür", () => {
         const all = SectorRegistry.list()
-        expect(all).toHaveLength(4)
+        expect(all).toHaveLength(6)
         expect(all.every((c) => typeof c.displayName === "string")).toBe(true)
         expect(all.every((c) => typeof c.rules === "object")).toBe(true)
+    })
+})
+
+describe("VAPE sektörü — yasal kurallar", () => {
+    it("yaş doğrulama 18+ zorunlu ve sağlık uyarısı aktif", () => {
+        const vape = SectorRegistry.get("vape")
+        expect(vape.rules.requiresAgeVerification).toBe(true)
+        expect(vape.rules.minimumAge).toBe(18)
+        expect(vape.rules.healthWarningRequired).toBe(true)
+    })
+
+    it("düzenlemeye tabi üründe loyalty varsayılan KAPALI", () => {
+        const vape = SectorRegistry.get("vape")
+        expect(vape.defaultFeatures).not.toContain("loyalty")
+    })
+
+    it("fiziksel stok zorunlu (dürüstlük ilkesi)", () => {
+        expect(SectorRegistry.get("vape").rules.enforcePhysicalStock).toBe(true)
+    })
+})
+
+describe("POOL sektörü — teknik içerik kuralları", () => {
+    it("teknik özellik alanları beklenir, stok dürüstlüğü aktif", () => {
+        const pool = SectorRegistry.get("pool")
+        expect(pool.rules.technicalSpecsRequired).toBe(true)
+        expect(pool.rules.enforcePhysicalStock).toBe(true)
+    })
+
+    it("yaş doğrulama GEREKMEZ (havuz ürünü yaş kısıtsız)", () => {
+        const pool = SectorRegistry.get("pool")
+        expect(pool.rules.requiresAgeVerification).toBeUndefined()
     })
 })
 
