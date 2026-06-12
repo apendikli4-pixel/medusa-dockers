@@ -19,7 +19,10 @@ import {
 import { trace } from "@opentelemetry/api"
 
 // Node 20+ global fetch sağlıyor.
-const nodeFetch = globalThis.fetch
+// ÇAĞRI ANINDA globalThis.fetch okunur (modül yükleme anında SABİTLENMEZ) — aksi halde
+// birim testleri fetch'i mock'layamaz (mock import'tan sonra atanıyor) → testler her
+// zaman gerçek ağa düşer ve hiçbir şeyi doğrulamaz (sahte güven). Wrapper bunu çözer.
+const nodeFetch = (input: any, init?: any): Promise<any> => (globalThis.fetch as any)(input, init)
 
 // ─── OLLAMA API TİPLERİ ────────────────────────────────────────────
 
