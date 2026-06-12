@@ -1,0 +1,24 @@
+#!/bin/sh
+# ============================================================================
+# AYNA-GENESIS — PRE-COMMIT GEÇİDİ (Denetim Katmanı 0)
+# ============================================================================
+# Staged dosyaları deterministik invariant-linter'dan geçirir. HATA varsa commit
+# REDDEDİLİR. Hiçbir AI "yaptım" diyerek bunu geçemez — bir programdır.
+#
+# Kurulum (her klonda bir kez):  git config core.hooksPath .githooks
+# Acil durum (bilinçli atlama):  git commit --no-verify   (kullanma; iz bırakır)
+# ============================================================================
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "pre-commit: node bulunamadı, denetim atlanıyor (CI yine de kontrol edecek)." >&2
+    exit 0
+fi
+
+node scripts/audit/invariant-lint.mjs --staged
+status=$?
+if [ "$status" -ne 0 ]; then
+    echo "" >&2
+    echo "✗ Commit reddedildi: mimari kural ihlali (yukarıda). Düzelt ya da bilinçliyse // audit-ignore: <kural> ekle." >&2
+    exit 1
+fi
+exit 0

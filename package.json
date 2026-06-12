@@ -9,7 +9,11 @@
         "db:migrate": "medusa db:migrate",
         "db:create": "medusa db:create",
         "db:setup": "medusa db:setup",
-        "test": "jest"
+        "test": "jest",
+        "audit:lint": "node scripts/audit/invariant-lint.mjs --all",
+        "audit:staged": "node scripts/audit/invariant-lint.mjs --staged",
+        "audit:full": "node scripts/audit/invariant-lint.mjs --all && tsc --noEmit -p tsconfig.json && jest --silent",
+        "prepare": "git config core.hooksPath .githooks || true"
     },
     "dependencies": {
         "@google-analytics/data": "^6.1.0",

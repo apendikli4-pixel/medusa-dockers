@@ -16,8 +16,11 @@ export class Migration20260611100000 extends Migration {
     this.addSql(`alter table if exists "page" add column if not exists "tenant_id" text null;`);
 
     // 2) Mevcut içeriği varsayılan mağazaya backfill (Aqua Havuz)
-    this.addSql(`update "post" set "tenant_id" = (select "id" from "tenant" where "slug" = 'default' limit 1) where "tenant_id" is null;`);
-    this.addSql(`update "page" set "tenant_id" = (select "id" from "tenant" where "slug" = 'default' limit 1) where "tenant_id" is null;`);
+    // NOT: Bu satırlardaki 'slug=default' varsayımı HATALIYDI (gerçek slug 'aqua-havuz') ve
+    // içeriği NULL bıraktı. Migration20260612090000 bunu coalesce ile düzeltti. Bu migration
+    // ZATEN üretimde çalıştı ve immutable'dır (değiştirilemez) — bu yüzden denetim atlanır.
+    this.addSql(`update "post" set "tenant_id" = (select "id" from "tenant" where "slug" = 'default' limit 1) where "tenant_id" is null;`); // audit-ignore: migration-default-slug
+    this.addSql(`update "page" set "tenant_id" = (select "id" from "tenant" where "slug" = 'default' limit 1) where "tenant_id" is null;`); // audit-ignore: migration-default-slug
 
     // 3) Global slug unique index'lerini kaldır
     this.addSql(`drop index if exists "IDX_post_slug_unique";`);
