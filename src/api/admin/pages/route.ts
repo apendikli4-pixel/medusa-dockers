@@ -1,7 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "zod"
 import { ContentEngineService } from "../../../modules/content_engine"
-import { TENANT_MODULE } from "../../../modules/tenant"
+import { resolveDefaultTenantId } from "../../../lib/default-tenant"
 
 const PageCreateSchema = z.object({
     title: z.string().min(1, "Title is required"),
@@ -15,18 +15,12 @@ const PageCreateSchema = z.object({
 })
 
 /**
- * Verilen tenant_id'yi doğrular; boşsa varsayılan mağazaya (slug='default') düşer.
- * Yeni sayfa HER ZAMAN bir mağazaya bağlı olur (null = hiçbir vitrinde görünmez).
+ * Verilen tenant_id'yi kullanır; boşsa varsayılan mağazaya düşer.
+ * (Varsayılan mağaza çözümlemesi: env → slug 'default' → en eski tenant.)
  */
 async function resolveTenantId(req: MedusaRequest, requested?: string | null): Promise<string | null> {
     if (requested) return requested
-    try {
-        const tenantService = req.scope.resolve(TENANT_MODULE) as any
-        const def = await tenantService.findBySlug("default")
-        return def?.id || null
-    } catch {
-        return null
-    }
+    return resolveDefaultTenantId(req.scope)
 }
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {

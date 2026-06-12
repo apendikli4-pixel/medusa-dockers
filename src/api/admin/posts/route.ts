@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MODULES, IContentEngineService, CreatePostInput, UpdatePostInput, ListPostsFilters } from "../../../types/index"
-import { TENANT_MODULE } from "../../../modules/tenant"
+import { resolveDefaultTenantId } from "../../../lib/default-tenant"
 import { z } from "@medusajs/framework/zod"
 
 const PostStatusSchema = z.enum(["draft", "published", "archived"])
@@ -36,18 +36,13 @@ const UpdatePostSchema = z.object({
 })
 
 /**
- * Verilen tenant_id'yi doğrular; boşsa varsayılan mağazaya (slug='default') düşer.
- * Böylece yeni içerik HER ZAMAN bir mağazaya bağlı olur (null = hiçbir vitrinde görünmez).
+ * Verilen tenant_id'yi kullanır; boşsa varsayılan mağazaya düşer.
+ * (Varsayılan mağaza çözümlemesi: env → slug 'default' → en eski tenant;
+ *  'slug=default' hardcode varsayımı içerik kaybına yol açmıştı.)
  */
 async function resolveTenantId(req: MedusaRequest, requested?: string | null): Promise<string | null> {
     if (requested) return requested
-    try {
-        const tenantService = req.scope.resolve(TENANT_MODULE) as any
-        const def = await tenantService.findBySlug("default")
-        return def?.id || null
-    } catch {
-        return null
-    }
+    return resolveDefaultTenantId(req.scope)
 }
 
 function isDuplicateError(error: unknown): boolean {

@@ -37,8 +37,9 @@ function fillMissing(target: Record<string, any>, defaults: Record<string, any>)
 
 /** Mağaza başına taşınan eski hardcode değerler (Footer.tsx, use-ayna-chat.ts, AgeGate). */
 const BACKFILL: Record<string, StoreConfig> = {
-    // Aqua Havuz (varsayılan mağaza)
-    "default": {
+    // Aqua Havuz (varsayılan mağaza) — DİKKAT: gerçek slug 'aqua-havuz', 'default' DEĞİL.
+    // ('default' varsayımı bu script'i sessizce atlatmıştı — Migration20260612090000 dersi.)
+    "aqua-havuz": {
         branding: {
             description: "Havuzunuzun berraklığı için ihtiyacınız olan her şey. Dürüstlük odaklı, yapay zekâ destekli alışveriş deneyimi.",
             keywords: ["havuz malzemeleri", "havuz kimyasalları", "havuz bakımı"],
