@@ -1,4 +1,5 @@
 import { ExecArgs } from "@medusajs/framework/types"
+import { PRODUCT_INDEX, applyProductIndexSettings } from "../lib/search/product-index-settings"
 
 /**
  * Meilisearch index ayarlarını (idempotent) kurar.
@@ -28,31 +29,14 @@ export default async function setupMeilisearch({ container }: ExecArgs) {
 
         // Index yoksa oluştur (varsa "already exists" hatasını yut).
         try {
-            await client.createIndex("products", { primaryKey: "id" })
+            await client.createIndex(PRODUCT_INDEX, { primaryKey: "id" })
             logger.info("[Meili Setup] 'products' index oluşturuldu.")
         } catch {
             // zaten var — sorun değil
         }
 
-        const index = client.index("products")
-
-        // Çoklu-mağaza izolasyonunun çalışması için sales_channel_ids ŞART.
-        await index.updateFilterableAttributes([
-            "sales_channel_ids",
-            "categories",
-            "tags",
-            "type",
-            "collection",
-            "status",
-        ])
-        await index.updateSearchableAttributes([
-            "title",
-            "description",
-            "handle",
-            "categories",
-            "tags",
-        ])
-        await index.updateSortableAttributes(["created_at", "updated_at"])
+        // Ayarlar tek doğruluk kaynağından uygulanır (Canlı Bütünlük Denetçisi onarıcısı da aynısını kullanır).
+        await applyProductIndexSettings(client.index(PRODUCT_INDEX))
 
         logger.info("[Meili Setup] 'products' index ayarları uygulandı (filterable: sales_channel_ids vb.).")
     } catch (e: any) {

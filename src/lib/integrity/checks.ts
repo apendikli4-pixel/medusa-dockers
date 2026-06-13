@@ -12,6 +12,7 @@
  *  - ai-provider: Ollama tek motor (Gemini kaldırıldı) — yoksa Ayna sohbeti çöker.
  */
 import type { Check, CheckResult } from "./types"
+import { PRODUCT_INDEX, ISOLATION_FILTER_ATTRIBUTE, applyProductIndexSettings } from "../search/product-index-settings"
 
 const r = (id: string, title: string, status: CheckResult["status"], detail: string, evidence?: Record<string, unknown>): CheckResult =>
     ({ id, title, status, detail, evidence })
@@ -49,6 +50,7 @@ const tenantsPresentCheck: Check = {
 const searchIsolationCheck: Check = {
     id: "search-isolation",
     title: "Arama indeksi tenant-izolasyonlu (sales_channel_ids filtrelenebilir)",
+    safeToAutoHeal: true, // onarım = indeks ayarını yeniden uygulama (idempotent, yıkıcı değil)
     async run({ env }) {
         const host = env.MEILISEARCH_HOST
         const apiKey = env.MEILISEARCH_MASTER_KEY
@@ -58,14 +60,25 @@ const searchIsolationCheck: Check = {
         try {
             const { MeiliSearch } = await import("meilisearch")
             const client = new MeiliSearch({ host, apiKey })
-            const filterable = await client.index("products").getFilterableAttributes()
-            const isolated = Array.isArray(filterable) && filterable.includes("sales_channel_ids")
+            const filterable = await client.index(PRODUCT_INDEX).getFilterableAttributes()
+            const isolated = Array.isArray(filterable) && filterable.includes(ISOLATION_FILTER_ATTRIBUTE)
             return isolated
                 ? r(this.id, this.title, "OK", "'products' indeksinde sales_channel_ids filtrelenebilir — arama tenant izolasyonu aktif.", { filterable })
-                : r(this.id, this.title, "FAIL", "'products' indeksinde sales_channel_ids FİLTRELENEBİLİR DEĞİL — arama tüm tenant ürünlerini sızdırabilir! Çözüm: setup-meilisearch script'ini çalıştır.", { filterable })
+                : r(this.id, this.title, "FAIL", "'products' indeksinde sales_channel_ids FİLTRELENEBİLİR DEĞİL — arama tüm tenant ürünlerini sızdırabilir! (Öz-onarım bu durumu düzeltebilir.)", { filterable })
         } catch (e) {
             return r(this.id, this.title, "FAIL", `Meilisearch erişilemedi: ${msg(e)}`)
         }
+    },
+    async heal({ env }) {
+        const host = env.MEILISEARCH_HOST
+        const apiKey = env.MEILISEARCH_MASTER_KEY
+        if (!host || !apiKey) return { changed: false, detail: "Meilisearch env yok — onarım yapılamadı." }
+        const { MeiliSearch } = await import("meilisearch")
+        const client = new MeiliSearch({ host, apiKey })
+        // Index yoksa oluştur (idempotent).
+        try { await client.createIndex(PRODUCT_INDEX, { primaryKey: "id" }) } catch { /* zaten var */ }
+        await applyProductIndexSettings(client.index(PRODUCT_INDEX))
+        return { changed: true, detail: "'products' indeks ayarları yeniden uygulandı (filterable: sales_channel_ids vb.)." }
     },
 }
 

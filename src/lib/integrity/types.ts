@@ -43,5 +43,36 @@ export interface CheckContext {
 export interface Check {
     id: string
     title: string
+    /**
+     * Bu kontrolün onarıcısı OTOMATİK (insan onayı olmadan) çalıştırılmaya uygun mu?
+     * Yalnızca idempotent ve YIKICI OLMAYAN onarımlar (config/ayar yeniden uygulama) true olmalı.
+     * Veri silen/taşıyan onarımlar ASLA güvenli sayılmaz — onlar insan onayı bekler.
+     */
+    safeToAutoHeal?: boolean
     run: (ctx: CheckContext) => Promise<CheckResult>
+    /**
+     * Opsiyonel onarıcı. Çalıştıktan sonra çağıran `run`'ı YENİDEN koşturur ve onarımın
+     * gerçekten işe yaradığını kanıtlar; yalnızca yeniden-kontrol OK dönerse "çözüldü" sayılır.
+     */
+    heal?: (ctx: CheckContext) => Promise<{ changed: boolean; detail: string }>
+}
+
+/** Tek bir onarım girişiminin DÜRÜST sonucu. */
+export interface HealResult {
+    id: string
+    attempted: boolean
+    /** Onarıcı gerçekten bir değişiklik uyguladı mı. */
+    changed: boolean
+    /** Onarımdan SONRA kontrol yeniden çalıştırıldı ve GEÇTİ mi (kanıtlanmış çözüm). */
+    resolved: boolean
+    detail: string
+}
+
+export interface SelfHealReport {
+    healedAt: string
+    attempts: HealResult[]
+    /** Onarılıp YENİDEN-KONTROLLE doğrulananların id'leri (gerçek düzeltmeler — sahte değil). */
+    fixed: string[]
+    /** Denenip çözülemeyenler (dürüstçe raporlanır, gizlenmez). */
+    unresolved: string[]
 }

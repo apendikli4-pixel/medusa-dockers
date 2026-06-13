@@ -31,4 +31,5 @@ export async function runIntegrityChecks(
 
 export { DEFAULT_CHECKS } from "./checks"
 export { aggregate } from "./aggregate"
-export type { IntegrityVerdict, CheckResult, CheckContext, Check } from "./types"
+export { runSelfHeal } from "./heal"
+export type { IntegrityVerdict, CheckResult, CheckContext, Check, HealResult, SelfHealReport } from "./types"
