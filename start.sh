@@ -65,6 +65,14 @@ if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ];
     timeout 60 ./node_modules/.bin/medusa exec ./src/scripts/backfill-store-config.ts || echo "Backfill başarısız/timeout (devam ediliyor; non-fatal)."
 fi
 
+# ─── Meilisearch index ayarları (idempotent) ───
+# 'products' index'inde filterableAttributes (sales_channel_ids vb.) ayarlar; yoksa
+# hybrid-search'in sales_channel filtresi Meili hatası verip aramayı boş döndürür.
+if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
+    echo "Meilisearch index ayarları uygulanıyor (idempotent, max 60s)..."
+    timeout 60 ./node_modules/.bin/medusa exec ./src/scripts/setup-meilisearch.ts || echo "Meili setup başarısız/timeout (devam ediliyor; non-fatal)."
+fi
+
 if [ "$MEDUSA_WORKER_MODE" = "server" ] || [ "$MEDUSA_WORKER_MODE" = "shared" ]; then
     echo "Starting role: $MEDUSA_WORKER_MODE"
     if [ "$NODE_ENV" != "production" ]; then
