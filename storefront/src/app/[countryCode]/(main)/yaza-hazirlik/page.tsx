@@ -2,15 +2,24 @@ import React from "react"
 import { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
+import { notFound } from "next/navigation"
 import PoolCalculator from "@/modules/campaigns/components/pool-calculator"
+import { retrieveCurrentTenant } from "@/lib/server/tenant"
 
 export const metadata: Metadata = {
-  title: "Yaza Hazırlık: Havuz Suyu Bakım Rehberi | Aqua Havuz",
+  title: "Yaza Hazırlık: Havuz Suyu Bakım Rehberi",
   description: "Havuzunuzu yaza hazırlamak için ihtiyacınız olan tüm kimyasallar ve bakım adımları. Havuz hacminizi hesaplayın ve indirimli ürünleri keşfedin.",
 }
 
 export default async function SummerCampaignPage({ params }: { params: Promise<{ countryCode: string }> }) {
   const { countryCode } = await params;
+
+  // Çoklu mağaza: bu kampanya HAVUZ sektörüne özeldir. Pool dışı mağazalarda
+  // (örn. Vozol/vape) havuz içeriği görünmemeli → 404. (Sektör/StoreConfig deseni.)
+  const tenant = await retrieveCurrentTenant();
+  if ((tenant?.sector || "").toLowerCase() !== "pool") {
+    notFound();
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e3a8a] to-[#0d9488] relative overflow-hidden">
       {/* Dekoratif Arka Plan Işıkları */}
