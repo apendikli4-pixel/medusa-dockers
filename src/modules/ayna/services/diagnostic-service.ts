@@ -56,10 +56,14 @@ export default class AynaDiagnosticService {
      * Link kopukluklarını tarar (Product-SalesChannel, Price-Region vb.)
      */
     async auditLinks(sharedContext?: Context) {
-        // Medusa v2 Link senkronizasyon kontrolü
-        this.logger_.info("[Diagnostic] Auditing system links...")
-        // Bu kısım projeye özel link tanımlarıyla genişletilebilir
-        return { status: "OK", message: "Link audit mechanism ready." }
+        // DÜRÜSTLÜK: Gerçek link-bütünlüğü kontrolü HENÜZ UYGULANMADI.
+        // "OK" döndürmek sahte-yeşil olur (Madde 3 ihlali); olduğu gibi "SKIPPED" deriz.
+        this.logger_.info("[Diagnostic] Link denetimi atlandı (henüz uygulanmadı).")
+        return {
+            status: "SKIPPED",
+            implemented: false,
+            message: "Link bütünlüğü denetimi henüz uygulanmadı — yeşil sayılmaz."
+        }
     }
 
     /**
@@ -101,11 +105,37 @@ export default class AynaDiagnosticService {
     }
 
     /**
-     * Otonom Onarım: Linkleri tamir eder
+     * Otonom Onarım — DÜRÜST sürüm.
+     * Şu an doğrulanmış-güvenli otomatik onarım YOKTUR. Bu yüzden ASLA "onarıldı" demez;
+     * gerçek denetimi koşar, neyin manuel müdahale gerektirdiğini açıkça listeler ve
+     * HİÇBİR DEĞİŞİKLİK YAPMADIĞINI dürüstçe bildirir. Güvenli otomatik onarımlar
+     * eklendikçe `fixed` dizisi gerçek eylemlerle dolacaktır (sahte değil).
      */
-    async runAutoFix(sharedContext?: Context) {
-        this.logger_.info("[Diagnostic] Auto-fix process initiated...")
-        // Buraya src/scripts/fix-* içerisindeki mantıklar delege edilecek
-        return { message: "System auto-fixed successfully." }
+    async runAutoFix(query?: RemoteQueryFunction, sharedContext?: Context) {
+        this.logger_.info("[Diagnostic] Auto-fix talebi alındı...")
+        if (!query) {
+            return {
+                status: "unavailable",
+                fixed: [] as string[],
+                needs_manual: [] as string[],
+                message: "Otomatik onarım çalıştırılamadı: query servisi yok. Hiçbir değişiklik yapılmadı."
+            }
+        }
+        const audit = await this.runFullAudit(query, sharedContext)
+        const needs_manual: string[] = []
+        for (const [area, result] of Object.entries(audit)) {
+            const status = String((result as any)?.status ?? "UNKNOWN")
+            if (status.startsWith("ERROR") || status.startsWith("WARNING")) {
+                needs_manual.push(`${area}: ${status}`)
+            }
+        }
+        return {
+            status: needs_manual.length ? "needs_manual_review" : "healthy",
+            fixed: [] as string[], // doğrulanmış-güvenli otomatik onarım eklendikçe dolacak
+            needs_manual,
+            message: needs_manual.length
+                ? `Otomatik onarım YOK. ${needs_manual.length} konu manuel inceleme bekliyor. Hiçbir değişiklik yapılmadı.`
+                : "Sistem denetimi temiz; onarılacak sorun bulunamadı. Hiçbir değişiklik yapılmadı."
+        }
     }
 }

@@ -115,7 +115,7 @@ export default class AynaToolService {
                 return await this.diagnosticService_.runFullAudit(services.remoteQuery)
             case "system_auto_fix":
                 if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
-                return await this.diagnosticService_.runAutoFix()
+                return await this.diagnosticService_.runAutoFix(services?.remoteQuery)
             case "predict_stock_shortage":
                 if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
                 if (!services?.remoteQuery) return { error: "Query service unavailable" }
