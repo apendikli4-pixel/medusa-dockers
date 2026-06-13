@@ -23,6 +23,16 @@ export async function globalRateLimiterMiddleware(
     res: MedusaResponse,
     next: MedusaNextFunction
 ) {
+    // ── VARSAYILAN KAPALI (opt-in) ──
+    // Bu global geçit IP bazında limitler. Ama topolojimizde storefront SSR tüm anonim
+    // /store/* çağrılarını TEK container IP'sinden yapar → açıkken 100/dk sınırı TÜM siteyi
+    // throttle edip herkese 429 verebilir (canlı kesintisi). Hassas uçlar (chat, auth, arama)
+    // zaten kendi route-bazlı limiter'larıyla korunur. Açmadan önce SSR gerçek istemci IP'sini
+    // (X-Forwarded-For) iletmeli VEYA muaf tutulmalı. Açmak için: GLOBAL_RATE_LIMIT_ENABLED=true
+    if (process.env.GLOBAL_RATE_LIMIT_ENABLED !== "true") {
+        return next()
+    }
+
     const path = req.path || req.url
 
     // Skip exempt paths
