@@ -20,12 +20,16 @@
 import { execSync } from "node:child_process"
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs"
 import { join, relative, sep } from "node:path"
+import { createHash } from "node:crypto"
 
 const ROOT = process.cwd()
 const args = process.argv.slice(2)
 const JSON_OUT = args.includes("--json")
 const SCAN_ALL = args.includes("--all")
 const fileArgs = args.filter((a) => !a.startsWith("--"))
+// Test modu: kural fixture'larını (scripts/audit/__tests__) doğrudan taramaya izin verir.
+// SADECE kural test paketi (audit:test) tarafından kullanılır; üretimde asla set edilmez.
+const TEST_MODE = process.env.AUDIT_TEST_MODE === "1"
 
 // ─── Hedef dosyaları belirle ───────────────────────────────────────────────
 function listSourceFiles(dir) {
@@ -57,6 +61,7 @@ else targets = gitStaged()
 targets = targets.filter((f) => /\.(ts|tsx)$/.test(f))
     .filter((f) => existsSync(f))
     .filter((f) => {
+        if (TEST_MODE) return true   // fixture'lar src/ dışında yaşar; testte yol kısıtını gevşet
         const r = relative(ROOT, f).split(sep).join("/")
         return (r.startsWith("src/") || r.startsWith("storefront/src/")) && !r.includes("scripts/audit/")
     })
@@ -188,7 +193,83 @@ const RULES = [
             return null
         },
     },
+    {
+        // Çoklu-tenant SaaS'ın EN BÜYÜK riski: cross-tenant veri sızıntısı. Tenant izolasyonu
+        // (PostgreSQL RLS + MikroORM global filter) YALNIZCA tenant modülünün kendisinde yönetilir.
+        // Bu bypass desenlerinin başka yerde görünmesi = izolasyonun bilerek/yanlışlıkla delinmesi.
+        id: "rls-bypass-forbidden",
+        severity: "error",
+        skipComments: true,
+        scope: (r) => !isTest(r) && !r.includes("modules/tenant/"),
+        test: (line) => {
+            if (/audit-ignore/.test(line)) return null
+            if (/\.disableFilter\s*\(/.test(line)) return "MikroORM filter kapatılıyor (.disableFilter) — tenant izolasyonu delinir. Tenant modülü dışında YASAK"
+            if (/(tenantIsolation|TENANT_FILTER_NAME)\s*\]?\s*:\s*false/.test(line)) return "tenantIsolation filtresi 'false' yapılıyor — cross-tenant veri sızıntısı riski"
+            if (/['"`]__system__['"`]/.test(line)) return "'__system__' RLS bypass'ı tenant modülü dışında kullanılıyor — tüm tenant'ların verisi açılır (yalnızca tenant modülü/sistem job'larında meşru)"
+            if (/app\.current_tenant_id/.test(line)) return "app.current_tenant_id doğrudan set ediliyor — RLS context'i yalnızca tenant-rls subscriber/migration tarafından yönetilmeli"
+            return null
+        },
+    },
+    {
+        // Supreme Law MADDE 6.1: hafıza (MemoryTruth/Insight/Conscience) DEĞİŞMEZ olay günlüğüdür.
+        // Tek meşru sert-silme yolu: arşivleyici cron (src/jobs/ayna-memory-archiver) + onun çağırdığı
+        // servis metotları. Bir AI'ın route/tool içine "memory temizle" eklemesi = kalıcı veri kaybı.
+        id: "immutable-memory",
+        severity: "error",
+        skipComments: true,
+        scope: (r) => !isTest(r)
+            && !r.includes("/migrations/")
+            && !r.startsWith("src/jobs/")
+            && !r.includes("modules/ayna/service.ts")
+            && !r.includes("modules/ayna/services/memory-service.ts"),
+        test: (line) => {
+            if (/audit-ignore/.test(line)) return null
+            if (/\bdelete(MemoryTruths?|MemoryInsights?|MemoryConsciences?)\b/.test(line))
+                return "Değişmez hafıza sert-silme çağrısı — yalnızca arşivleyici job'da meşru. Yumuşak işaret için is_archived:true kullan"
+            if (/DELETE\s+FROM\s+["'`]?memory_(truth|insight|conscience)/i.test(line))
+                return "memory_* tablosunda doğrudan DELETE — değişmez hafıza ihlali (Supreme Law 6.1)"
+            if (/memory_(truth|insight|conscience)/i.test(line) && /\.(remove|destroy|delete)\s*\(/.test(line))
+                return "memory_* üzerinde remove/destroy/delete — değişmez hafıza ihlali (is_archived kullan)"
+            return null
+        },
+    },
 ]
+
+// ─── MÜHÜR DENETİMİ (sealed-file-guard) ────────────────────────────────────
+// @sealed başlıklı dosyalar mimarinin kritik temelidir (08_ARCHITECTURE_SEAL.md).
+// İçerik hash'i scripts/audit/sealed.manifest.json'da saklanır. Bir mühürlü dosya
+// değişirse hash tutmaz → commit BLOKLANIR. Bilinçli değişiklik için `npm run audit:seal`
+// çalıştırılır (mührü yeniler). Bu, AI'ın kritik dosyayı sessizce değiştirmesini engeller.
+// Per-satır metin işaretinin aksine kalıcı bir "ignore" ile kandırılamaz.
+const SEAL_MARKER = /@sealed/
+const MANIFEST_PATH = join(ROOT, "scripts", "audit", "sealed.manifest.json")
+// Platformlar arası tutarlılık: satır sonlarını normalize ederek hash'le (CRLF/LF farkı hash'i bozmasın).
+function sealHash(content) {
+    return createHash("sha256").update(content.replace(/\r\n/g, "\n"), "utf8").digest("hex")
+}
+function loadManifest() {
+    try { return JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) } catch { return {} }
+}
+// Tam tarama (--all) hariç — mühür denetimi yalnızca commit/diff bağlamında anlamlıdır.
+function checkSeals(files, sink) {
+    if (SCAN_ALL) return
+    const manifest = loadManifest()
+    for (const file of files) {
+        let content
+        try { content = readFileSync(file, "utf8") } catch { continue }
+        if (!SEAL_MARKER.test(content)) continue
+        const r = rel(file)
+        const current = sealHash(content)
+        const sealed = manifest[r]
+        if (!sealed) {
+            sink.push({ file: r, line: 1, rule: "sealed-file-guard", severity: "error",
+                message: "Yeni MÜHÜRLÜ dosya (@sealed) manifest'te yok — `npm run audit:seal` çalıştır ve manifest'i commit'e ekle" })
+        } else if (sealed !== current) {
+            sink.push({ file: r, line: 1, rule: "sealed-file-guard", severity: "error",
+                message: "MÜHÜR KIRILDI — mühürlü dosya değişti. Bilinçliyse `npm run audit:seal` çalıştır + docs/GENESIS_PROTOCOL/08_ARCHITECTURE_SEAL.md'yi güncelle" })
+        }
+    }
+}
 
 // ─── Tarama ────────────────────────────────────────────────────────────────
 const findings = []
@@ -209,6 +290,9 @@ for (const file of targets) {
         }
     }
 }
+
+// Mühür denetimi (hash tabanlı) — satır kurallarından bağımsız, dosya bütünü üzerinde.
+checkSeals(targets, findings)
 
 const errors = findings.filter((f) => f.severity === "error")
 const warns = findings.filter((f) => f.severity === "warn")

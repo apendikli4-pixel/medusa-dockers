@@ -37,6 +37,7 @@
         ".cache",
         "src/links_backup",
         "src/scripts/archive",
+        "scripts/audit/fixtures",
         "storefront"
     ]
 }

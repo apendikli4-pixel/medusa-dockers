@@ -12,6 +12,8 @@
         "test": "jest",
         "audit:lint": "node scripts/audit/invariant-lint.mjs --all",
         "audit:staged": "node scripts/audit/invariant-lint.mjs --staged",
+        "audit:seal": "node scripts/audit/seal.mjs",
+        "audit:test": "jest --silent scripts/audit/__tests__",
         "audit:full": "node scripts/audit/invariant-lint.mjs --all && tsc --noEmit -p tsconfig.json && jest --silent",
         "prepare": "git config core.hooksPath .githooks || true"
     },

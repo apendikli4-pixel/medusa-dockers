@@ -13,6 +13,9 @@
  * subscriber'lar modülün loader'ı aracılığıyla kayıt edilmelidir.
  *
  * @see tenant-rls.subscriber.ts (EventSubscriber implementasyonu)
+ *
+ * @sealed  — CRITICAL: RLS SET LOCAL kaydı. Değişiklik için:
+ *           npm run audit:seal + docs/GENESIS_PROTOCOL/08_ARCHITECTURE_SEAL.md güncelle.
  */
 
 import { LoaderOptions } from "@medusajs/framework/types"

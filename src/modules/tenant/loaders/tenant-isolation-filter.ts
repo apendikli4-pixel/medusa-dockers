@@ -42,6 +42,9 @@
  * @see tenant-context-store.ts (ALS — getTenantId())
  * @see tenant-rls.subscriber.ts (Transaction-level SET LOCAL)
  * @see Migration20260513120000.ts (PostgreSQL RLS politikaları)
+ *
+ * @sealed  — CRITICAL: tenant izolasyonunun temeli. Değişiklik için:
+ *           npm run audit:seal + docs/GENESIS_PROTOCOL/08_ARCHITECTURE_SEAL.md güncelle.
  */
 
 import { LoaderOptions } from "@medusajs/framework/types"

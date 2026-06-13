@@ -4,7 +4,23 @@ description: Ajan İş Akışı Koordinatörü - Tüm ajanları yöneten merkezi
 
 # AJAN İŞ AKIŞI KOORDİNATÖRÜ (AGENT WORKFLOW COORDINATOR)
 
-Bu belge, PROJECT-AYNA-GENESIS projesindeki otonom ajan ekosistemini yöneten merkezi koordinasyon sistemini tanımlar.
+> ## ⚠️ DÜRÜSTLÜK NOTU — BU DOSYA ASPİRASYONELDİR (OTOMATİK ÇALIŞMAZ)
+> Aşağıdaki 8 "uzman ajan" ve `/evrim-motoru`, `/denetle` gibi komutlar **manuel rol
+> promptlarıdır** — bir insanın bir AI asistanına (Claude/Gemini) elle vermesi gereken
+> yönergelerdir. Bunları otomatik çalıştıran **hiçbir runner, hook, CI adımı veya
+> slash-handler YOKTUR**. "Her commit'te otomatik denetim" buradan değil, aşağıdaki
+> GERÇEK geçitten gelir:
+>
+> **GERÇEK (atlanamaz) denetim mekanizması = deterministik program + CI:**
+> - `scripts/audit/invariant-lint.mjs` — pre-commit hook'a bağlı, HATA'da commit'i reddeder.
+> - `.github/workflows/ci.yml` — push/PR'da `audit:lint` + `audit:test` + `tsc` + `jest` (sunucu tarafı).
+> - `scripts/audit/sealed.manifest.json` — mühürlü dosyalar değişince commit'i bloklar.
+> - Protokol: `docs/AI-CALISMA-PROTOKOLU.md` ("Yaptım demek yasak, kanıt göster").
+>
+> Bu dosyadaki ekosistem, o gerçek geçidin üstüne bir gün otomasyon kurulursa yol haritasıdır.
+> Aşağıdaki "Otomatik Tetikleme" iddialarını bu çerçevede oku.
+
+Bu belge, PROJECT-AYNA-GENESIS projesi için tasarlanan (henüz manuel) uzman-ajan rol setini tanımlar.
 
 ## 🎯 Genel Bakış
 
@@ -275,11 +291,15 @@ Her ajan için takip edilen metrikler:
 /devops-iyilestir "docker-compose.yml"
 ```
 
-### Otomatik Tetikleme:
-- Her commit'te: Kod denetimi, test coverage kontrolü
-- Her feature branch'te: Güvenlik taraması, SEO değerlendirmesi
-- Haftalık: Sistem performansı analizi, teknik borç raporu
-- Aylık: Teknoloji güncellemesi, rakip analizi
+### Otomatik Tetikleme (HEDEF — henüz uygulanmadı):
+> ⚠️ Aşağıdakiler **planlanmış** otomasyonlardır; şu an OTOMATİK ÇALIŞMAZ. Bugün gerçekten
+> otomatik olan tek şey, `.github/workflows/ci.yml` ve pre-commit hook'taki deterministik
+> denetimdir (kod/izolasyon/mühür/tip/test geçitleri). Aşağıdaki AI-ajan tetikleyicileri
+> bir orkestratöre bağlanana kadar yalnızca manuel taleple çalışır.
+- (Hedef) Her commit'te: AI kod denetimi, test coverage yorumu
+- (Hedef) Her feature branch'te: Güvenlik taraması, SEO değerlendirmesi
+- (Hedef) Haftalık: Sistem performansı analizi, teknik borç raporu
+- (Hedef) Aylık: Teknoloji güncellemesi, rakip analizi
 
 ## 📈 Gelecek Geliştirmeler
 
@@ -320,6 +340,7 @@ Bir ajan iş akışının başarılı sayılması için:
 
 ---
 
-**Son Güncelleme:** 2026-05-14  
-**Durum:** ACTIVE  
-**Sorumlu:** Evrim Motoru (Çatı Ajan)
+**Son Güncelleme:** 2026-06-14  
+**Durum:** ASPİRASYONEL (manuel rol promptları — otomatik orkestrasyon YOK)  
+**Gerçek enforcement:** `scripts/audit/invariant-lint.mjs` + `.github/workflows/ci.yml`  
+**Sorumlu:** Evrim Motoru (Çatı Ajan — manuel tetikleme)

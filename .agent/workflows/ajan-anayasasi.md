@@ -36,7 +36,11 @@ Bu listeden herhangi biri "Hayır" ise, ajan işlemi düzeltir ve ardından deva
 - **ÖLÇÜT:** Yazılacak her kod, her veritabanı tablosu ve eklenecek her yeni özellik mutlak suretle **Multi-Tenant (Çoklu Mağaza) izolasyonuna** sahip olmalı, temalar dinamik olarak markalara göre değişebilmeli ve ajanın icat ettiği yenilikler "Diğer sektörlerdeki müşterilere satılabilir mi?" vizyonuyla değerlendirilmelidir. Ajan hiçbir zaman tek bir markanın kodlayıcısı gibi değil, global bir SaaS ürününün mimarı gibi düşünmelidir.
 
 ## MADDE 6: AJAN İŞ AKIŞI KOORDİNASYONU
-- **ZORUNLU:** Her geliştirme çalışmasında `.agent/workflows/WORKFLOW_COORDINATOR.md` dosyasındaki ajan ekosistemi kurallarına uyulmalıdır.
+> ⚠️ NOT: `WORKFLOW_COORDINATOR.md`'deki 8-ajan ekosistemi ASPİRASYONELDİR (manuel rol
+> promptları; otomatik orkestrasyon yoktur). Bu madde, manuel çalışırken çok-perspektifli
+> düşünmeyi teşvik eder. GERÇEK, atlanamaz denetim ise deterministik programdır:
+> `scripts/audit/invariant-lint.mjs` (pre-commit) + `.github/workflows/ci.yml` (sunucu).
+- **ZORUNLU:** Her geliştirme çalışmasında `.agent/workflows/WORKFLOW_COORDINATOR.md` dosyasındaki ajan ekosistemi kurallarına (manuel rehber olarak) uyulmalıdır.
 - **ZORUNLU:** Evrim Motoru çatı ajan olarak, diğer 7 uzman ajandan (Araştırmacı, Kod Denetçisi, Test Mühendisi, DevOps Uzmanı, Güvenlik Uzmanı, Dokümantasyon Uzmanı, SEO Uzmanı) gelen girdileri sentezleyerek bütünsel çözümler üretmelidir.
 - **ÖLÇÜT:** Bir özellik geliştirilirken en az 3 farklı ajan perspektifinden değerlendirilmiş olmalıdır (örn: güvenlik + test + dokümantasyon).
 

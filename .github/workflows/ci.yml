@@ -32,6 +32,13 @@ jobs:
           cache: "npm"
       - name: Install deps
         run: npm ci --legacy-peer-deps
+      # Mimari geçit: deterministik invariant denetçisi. Pre-commit atlansa (--no-verify)
+      # bile bozuk/izolasyon-delen kod buradan geçemez — sunucu tarafı, atlanamaz.
+      - name: Architecture invariant gate
+        run: npm run audit:lint
+      # Denetçinin kendisi de denetlenir: kural regresyonu testlerle yakalanır.
+      - name: Invariant rule self-tests
+        run: npm run audit:test
       - name: TypeScript check
         run: npx tsc --noEmit
       - name: Run tests
@@ -71,8 +78,10 @@ jobs:
           cache-dependency-path: storefront/package-lock.json
       - name: Install deps
         run: npm ci --legacy-peer-deps
-      - name: ESLint
-        run: npm run lint || true
+      # Storefront tip güvenliği: 'next lint' kurulu değil (interaktif, anlamsızdı).
+      # Yerine gerçek tsc geçidi — tip-uyumsuz storefront kodu sunucuda yakalanır.
+      - name: TypeScript check
+        run: npx tsc --noEmit
       - name: Production build
         run: npm run build
 
