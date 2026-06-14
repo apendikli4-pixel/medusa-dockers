@@ -7,12 +7,13 @@ import { HybridAIProviderService } from "./hybrid-ai.provider"
 import { SemanticCacheService, CacheType } from "../../../lib/cache/semantic-cache.service"
 import InjectionDetectorService from "../../../modules/conscience/services/injection-detector.service"
 import { SectorRegistry } from "../../../lib/sector-framework"
+import { recordSecurityEvent } from "../../../lib/security/security-events"
 
 /**
  * Güvenlik sabitleri — function calling loop ve payload boyutu.
  * Sonsuz döngü ve OOM saldırılarına karşı koruma.
  */
-const MAX_TOOL_CALL_ITERATIONS = 3
+const MAX_TOOL_CALL_ITERATIONS = 4
 const MAX_IMAGE_PAYLOAD_BYTES = 10 * 1024 * 1024 // 10MB (base64 encoded)
 
 import { volumeCalculatorTool } from "../tools/volume-calculator-tool"
@@ -33,6 +34,7 @@ import { deviceCompatibilityTool } from "../tools/device-compatibility-tool"
 import { villaSearchTool } from "../tools/villa-search-tool"
 import { createMissionTool } from "../tools/create_mission"
 import { analyzeTrafficTool } from "../tools/analyze_traffic"
+import { seedCatalogTool } from "../tools/seed-catalog-tool"
 
 // Statik diziler kaldırıldı. Dinamik oluşturucu fonksiyon:
 function getToolsForSector(sector: string, isAdmin: boolean) {
@@ -76,6 +78,7 @@ function getToolsForSector(sector: string, isAdmin: boolean) {
             quickOrderTool,
             productCreateTool,
             storeGeneratorTool,
+            seedCatalogTool,
             createMissionTool,
             analyzeTrafficTool
         ]
@@ -130,7 +133,14 @@ export default class AynaChatService {
                 input: message.substring(0, 100) + (message.length > 100 ? "..." : ""),
                 isAdmin: options.isAdmin || false
             });
-            
+
+            recordSecurityEvent("INJECTION_BLOCKED", {
+                ip: "",
+                path: "/ayna/chat",
+                actor: options.customerId || "anonymous",
+                details: { riskScore: injectionResult.riskScore, isAdmin: options.isAdmin || false },
+            })
+
             // Return a safe response instead of processing the malicious input
             return {
                 response: "Girdiğiniz mesaj güvenlik kurallarımıza uymuyor. Lütfen ifadenizi değiştirerek tekrar deneyin.",
@@ -219,9 +229,12 @@ export default class AynaChatService {
         const sector = options.tenantSector || "retail"
         const dynamicTools = getToolsForSector(sector, isAdmin)
         
+        // Admin modunda toplu araç çağrıları (ör. generate_storefront_data /
+        // seed_sector_catalog) büyük JSON üretebilir; 1000 token bunu yarıda keser.
+        // Bu yüzden admin'e daha geniş çıktı bütçesi ver, store sohbetini hızlı tut.
         const genOptions: any = {
             temperature: 0.7,
-            maxTokens: 1000,
+            maxTokens: isAdmin ? 4096 : 1000,
             responseFormat: "text" as const,
             tools: dynamicTools
         }
@@ -340,6 +353,7 @@ Bu kimliğin dışına çıkma ve bu uzmanlığa uygun yanıtlar ver.`
                     const toolResult = await this.toolService_.handleToolCall(toolName, toolArgs, {
                         isAdmin,
                         tenantId: options.tenantId,
+                        tenantSector: options.tenantSector,
                         remoteQuery: options.remoteQuery,
                         remoteLink: options.remoteLink,
                         productModuleService: options.productModuleService,

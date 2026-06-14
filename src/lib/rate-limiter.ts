@@ -7,6 +7,7 @@ import { getRedisClient, initRedis } from "./redis/client";
 import type { RateLimitConfig } from "../config/rate-limits";
 import { ADMIN_WHITELIST_IPS, RATE_LIMIT_REDIS_PREFIX } from "../config/rate-limits";
 import { isIpAllowed } from "./ip-allowlist";
+import { recordSecurityEvent } from "./security/security-events";
 import logger from "./logger";
 
 interface RateLimitLimiter {
@@ -166,6 +167,13 @@ export async function applyRateLimit(
                 userAgent: req.headers["user-agent"],
             });
 
+            recordSecurityEvent("RATE_LIMIT_EXCEEDED", {
+                ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "",
+                path: req.path,
+                method: req.method,
+                actor: clientId,
+            });
+
             res.status(429).json({
                 error: "RATE_LIMIT_EXCEEDED",
                 message: errorMessage,
@@ -228,6 +236,12 @@ function applyRateLimitInMemory(
             clientId,
             count: entry.count,
             maxRequests: config.maxRequests,
+        });
+        recordSecurityEvent("RATE_LIMIT_EXCEEDED", {
+            ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "",
+            path: req.path,
+            method: req.method,
+            actor: clientId,
         });
         res.status(429).json({
             error: "RATE_LIMIT_EXCEEDED",
