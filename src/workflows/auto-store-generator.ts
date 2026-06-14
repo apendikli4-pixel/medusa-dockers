@@ -88,24 +88,36 @@ const createStoreProductsStep = createStep(
                 categories,
                 sales_channels: salesChannels
             })
-            
-            await productModule.createProductVariants({
+
+            const variant = await productModule.createProductVariants({
                 product_id: product.id,
                 title: "Default",
                 sku: `SKU-${handle}`,
                 manage_inventory: true,
                 inventory_items: []
             })
-            
+
+            // Fiyatı oluştur VE varyanta bağla. Önceki sürüm price set'i oluşturup
+            // boşta bırakıyordu (varyanta link yok) → ürünler fiyatsız görünüyordu.
             if (prod.price && pricingModule) {
                 try {
-                    await pricingModule.createPriceSets([{
+                    const [priceSet] = await pricingModule.createPriceSets([{
                         prices: [{ amount: prod.price, currency_code: "try" }],
                         rules: []
                     }])
-                } catch (e) {}
+
+                    const remoteLink = container.resolve("remoteLink")
+                    if (remoteLink && variant?.id && priceSet?.id) {
+                        await remoteLink.create({
+                            [Modules.PRODUCT]: { variant_id: variant.id },
+                            [Modules.PRICING]: { price_set_id: priceSet.id }
+                        })
+                    }
+                } catch (e) {
+                    console.error(`Fiyat bağlama başarısız (${prod.title})`, e)
+                }
             }
-            
+
             createdProductIds.push(product.id)
         }
         

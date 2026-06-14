@@ -42,7 +42,7 @@ export const storeGeneratorTool = {
             },
             blog_post: {
                 type: SchemaType.OBJECT,
-                description: "Açılış veya konsept tanıtımı için yazılacak ilk SEO dostu makale",
+                description: "İSTEĞE BAĞLI. Açılış/konsept tanıtımı için ilk SEO dostu makale. Verilmezse otomatik bir tanıtım yazısı oluşturulur — sırf bunun için işlemi bekletme.",
                 properties: {
                     title: { type: SchemaType.STRING },
                     content: { type: SchemaType.STRING, description: "Makalenin geniş içeriği (Markdown veya HTML değil, düz metin formatında uzun makale)" }
@@ -50,6 +50,6 @@ export const storeGeneratorTool = {
                 required: ["title", "content"]
             }
         },
-        required: ["concept_name", "categories", "products", "blog_post"]
+        required: ["concept_name", "categories", "products"]
     }
 }

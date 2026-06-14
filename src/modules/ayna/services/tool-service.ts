@@ -5,6 +5,7 @@ import { ollamaGenerate } from "../../../lib/ollama-client"
 import AynaMemoryService from "./memory-service"
 import AynaDiagnosticService from "./diagnostic-service"
 import AynaStockIntelligenceService from "./stock-intelligence-service"
+import { getSectorCatalog, listCatalogSectors } from "../data/sector-catalogs"
 
 type InjectedDependencies = {
     logger: Logger
@@ -83,6 +84,7 @@ export default class AynaToolService {
             remoteLink?: any
             isAdmin?: boolean
             tenantId?: string
+            tenantSector?: string
         }
     ): Promise<any> {
         this.logger_.info(`[AynaTool] Executing tool: ${toolName}`)
@@ -142,6 +144,9 @@ export default class AynaToolService {
             case "generate_storefront_data":
                 if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
                 return await this.executeStoreGenerator(args, services)
+            case "seed_sector_catalog":
+                if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
+                return await this.executeSeedCatalog(args, services)
             case "create_mission":
                 if (!services?.isAdmin) return { error: "Bu araç yalnızca admin kullanıcıları tarafından kullanılabilir." }
                 return await this.executeCreateMission(args, services)
@@ -885,6 +890,87 @@ export default class AynaToolService {
         } catch (e: any) {
             this.logger_.error(`[AynaTool] Store Generator hatası: ${e.message}`, e)
             return { error: `Mağaza oluşturma hatası: ${e.message}` }
+        }
+    }
+
+    /**
+     * Deterministik sektör kataloğu yükleyici — `seed_sector_catalog` aracı.
+     *
+     * Küratörlü hazır katalogdan (src/modules/ayna/data/sector-catalogs.ts) bir
+     * sektörün TÜM kategori + ürünlerini autoStoreGeneratorWorkflow ile TEK işlemde
+     * basar. Model katalogu üretmez → eksiksiz ve tekrarlanabilir sonuç.
+     *
+     * executeStoreGenerator'dan farkı: tenant YOKSA yeni tenant yaratmaya çalışmaz;
+     * varsayılan satış kanalına ekler (mevcut tek-mağaza kurulumlarına uygun).
+     */
+    private async executeSeedCatalog(args: Record<string, any>, services: any) {
+        try {
+            if (!this.container_) {
+                return { error: "Medusa container bulunamadığı için katalog yüklenemiyor." }
+            }
+
+            // Sektör: açıkça verilen > mağazanın kendi sektörü.
+            const sector = (args.sector || services.tenantSector || "").toString().trim()
+            const catalog = getSectorCatalog(sector)
+            if (!catalog) {
+                const available = listCatalogSectors().join(", ") || "—"
+                return {
+                    error: `'${sector || "(belirtilmedi)"}' için hazır katalog bulunamadı. ` +
+                        `Hazır katalog olan sektörler: ${available}. ` +
+                        `Özel/serbest bir liste için generate_storefront_data aracını kullanın.`,
+                }
+            }
+
+            // Satış kanalı: tenant varsa onun kanalını bul; yoksa workflow varsayılana düşer.
+            let salesChannelId: string | undefined = undefined
+            if (services.tenantId && services.remoteQuery) {
+                try {
+                    const { data } = await services.remoteQuery.graph({
+                        entity: "tenant",
+                        fields: ["sales_channel.*"],
+                        filters: { id: services.tenantId },
+                    })
+                    if (data && data.length > 0 && data[0].sales_channel) {
+                        salesChannelId = data[0].sales_channel.id
+                    }
+                } catch (e: any) {
+                    this.logger_.warn(`[AynaTool] Seed: tenant satış kanalı çözülemedi: ${e.message}`)
+                }
+            }
+
+            const { autoStoreGeneratorWorkflow } = await import("../../../workflows/auto-store-generator.js")
+            const { result } = await autoStoreGeneratorWorkflow(this.container_).run({
+                input: {
+                    concept_name: catalog.concept_name,
+                    categories: catalog.categories,
+                    products: catalog.products,
+                    blog_post: {
+                        title: `${catalog.concept_name}`,
+                        content: `Mağazamızda ${catalog.concept_name.toLowerCase()} kapsamında geniş bir ürün yelpazesi sizleri bekliyor.`,
+                    },
+                    sales_channel_id: salesChannelId,
+                },
+            })
+
+            await this.memoryService_.recordTruth("admin", "sector_catalog_seeded", {
+                sector,
+                tenant_id: services.tenantId || null,
+                categories_created: result.categoriesCreated,
+                products_created: result.productsCreated,
+            })
+
+            return {
+                success: true,
+                sector,
+                message:
+                    `'${sector}' sektörü kataloğu başarıyla yüklendi. ` +
+                    `${result.categoriesCreated} kategori ve ${result.productsCreated} ürün eklendi.`,
+                categoriesCreated: result.categoriesCreated,
+                productsCreated: result.productsCreated,
+            }
+        } catch (e: any) {
+            this.logger_.error(`[AynaTool] Seed Catalog hatası: ${e.message}`, e)
+            return { error: `Katalog yükleme hatası: ${e.message}` }
         }
     }
 
