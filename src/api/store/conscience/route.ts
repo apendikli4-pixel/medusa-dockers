@@ -98,6 +98,7 @@ export const GET = async (
         try {
             const cartResult = await remoteQuery.graph({
                 entity: "cart",
+                // audit-ignore: store-tenant-scope — auth-scoped: kimlik-doğrulanmış müşterinin KENDİ cart'ı (customer_id); cross-tenant sızıntı yok
                 fields: ["total"],
                 filters: { customer_id: customerId }
             })
@@ -176,6 +177,7 @@ export const GET = async (
 
         const orderResult = await remoteQuery.graph({
             entity: "order",
+            // audit-ignore: store-tenant-scope — auth-scoped: müşterinin KENDİ sipariş geçmişi (bütçe analizi); cross-tenant sızıntı yok
             fields: ["total", "created_at"],
             filters: {
                 customer_id: customerId,

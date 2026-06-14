@@ -27,6 +27,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         try {
             const { data: orders } = await remoteQuery.graph({
                 entity: "order",
+                // audit-ignore: store-tenant-scope — auth-scoped: müşterinin KENDİ siparişleri (verified-purchase kontrolü); cross-tenant sızıntı yok
                 fields: ["id", "items.product_id", "items.variant.product_id"],
                 filters: { customer_id: customerId }
             })

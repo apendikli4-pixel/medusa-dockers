@@ -20,15 +20,33 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
             return res.status(400).json({ error: "Sipariş numarası geçersiz." })
         }
 
+        // ─── TENANT İZOLASYONU (cross-tenant sızıntı önlemi) ───
+        // order çekirdek tablosunun RLS politikası YOK; bu sorgu AKTİF mağazanın (tenant)
+        // sales_channel'ı ile sınırlanmazsa başka mağazanın siparişi email+display_id ile görülebilir.
+        // req.tenant_id /store/* için fail-closed middleware ile garanti; sales_channel storefront-scoper'dan.
+        let salesChannelId = (req.query as Record<string, unknown>)?.sales_channel_id as string | undefined
+        if (!salesChannelId && req.tenant_id) {
+            const { data: t } = await remoteQuery.graph({
+                entity: "tenant",
+                fields: ["sales_channel.id"],
+                filters: { id: req.tenant_id },
+            })
+            salesChannelId = t?.[0]?.sales_channel?.id
+        }
+        if (!salesChannelId) {
+            // İzolasyon sağlanamıyorsa veri DÖNME (fail-closed) — sızıntıdansa "bulunamadı" daha güvenli.
+            return res.status(404).json({ error: "Bu bilgilere ait sipariş bulunamadı." })
+        }
+
         const { data: orders } = await remoteQuery.graph({
             entity: "order",
             fields: [
-                "id", 
-                "display_id", 
-                "email", 
-                "status", 
-                "payment_status", 
-                "fulfillment_status", 
+                "id",
+                "display_id",
+                "email",
+                "status",
+                "payment_status",
+                "fulfillment_status",
                 "created_at",
                 "items.id",
                 "items.title",
@@ -44,7 +62,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
             ],
             filters: {
                 email: validated.email,
-                display_id: numericDisplayId
+                display_id: numericDisplayId,
+                sales_channel_id: salesChannelId
             }
         })
 

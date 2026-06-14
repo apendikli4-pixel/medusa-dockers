@@ -211,6 +211,30 @@ const RULES = [
         },
     },
     {
+        // Çekirdek Medusa entity'lerinin (order/cart/customer/payment) tenant RLS politikası YOKTUR;
+        // izolasyon SalesChannel ile sağlanır. Store route'unda sales_channel_id ile sınırlanmayan
+        // bir sorgu = cross-tenant veri sızıntısı riski (gerçek hata: order-track/returns email ile).
+        id: "store-tenant-scope",
+        severity: "error",
+        scope: (r) => r.startsWith("src/api/store/") && !isTest(r),
+        test: (line, r, all, idx) => {
+            const m = /entity:\s*["'](order|cart|customer|payment)["']/.exec(line)
+            if (!m) return null
+            if (/audit-ignore/.test(line)) return null
+            // Bu entity'nin sorgu bloğunu tara: BİR SONRAKİ entity'ye (ya da +50 satır) kadar.
+            // Uzun 'fields' listeleri sales_channel_id'yi geç satıra itebilir; sabit pencere yetersiz.
+            const limit = Math.min(all.length, idx + 50)
+            let end = idx + 1
+            for (let i = idx + 1; i < limit; i++) {
+                if (/entity:\s*["']/.test(all[i])) break // sonraki sorgu başladı
+                end = i + 1
+            }
+            const window = all.slice(idx, end).join("\n")
+            if (/sales_channel_id|audit-ignore:\s*store-tenant-scope/.test(window)) return null
+            return `Store sorgusu '${m[1]}' sales_channel_id ile sınırlanmamış — cross-tenant sızıntı riski. Filtreye sales_channel_id ekle; auth-scoped (kendi verisi) ise // audit-ignore: store-tenant-scope <gerekçe>`
+        },
+    },
+    {
         // Supreme Law MADDE 6.1: hafıza (MemoryTruth/Insight/Conscience) DEĞİŞMEZ olay günlüğüdür.
         // Tek meşru sert-silme yolu: arşivleyici cron (src/jobs/ayna-memory-archiver) + onun çağırdığı
         // servis metotları. Bir AI'ın route/tool içine "memory temizle" eklemesi = kalıcı veri kaybı.

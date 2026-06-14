@@ -18,13 +18,30 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             return res.status(400).json({ error: "Sipariş numarası geçersiz." })
         }
 
+        // ─── TENANT İZOLASYONU (cross-tenant sızıntı önlemi) ───
+        // Auth'suz + email ile order sorgusu; order tablosunun RLS'i yok. AKTİF mağazanın
+        // sales_channel'ı ile sınırlanmazsa başka mağazanın siparişine iade açılabilir.
+        let salesChannelId = (req.body as Record<string, unknown>)?.sales_channel_id as string | undefined
+        if (!salesChannelId && req.tenant_id) {
+            const { data: t } = await remoteQuery.graph({
+                entity: "tenant",
+                fields: ["sales_channel.id"],
+                filters: { id: req.tenant_id },
+            })
+            salesChannelId = t?.[0]?.sales_channel?.id
+        }
+        if (!salesChannelId) {
+            return res.status(404).json({ error: "Sipariş bulunamadı veya e-posta eşleşmiyor." })
+        }
+
         // Siparişi bul ve 14 gün kuralını kontrol et
         const { data: orders } = await remoteQuery.graph({
             entity: "order",
             fields: ["id", "display_id", "email", "created_at"],
             filters: {
                 email: body.email,
-                display_id: numericDisplayId
+                display_id: numericDisplayId,
+                sales_channel_id: salesChannelId
             }
         })
 
