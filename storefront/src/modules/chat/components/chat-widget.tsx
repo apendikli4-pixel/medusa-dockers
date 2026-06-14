@@ -35,8 +35,11 @@ export default function ChatWidget({
 
     // AI kapalı → müşteri WhatsApp'a yönlendirilir (admin'den yönetilir).
     const aiOff = aiChatEnabled === false
+    // Numara normalizasyonu: yerel TR (0xxx) → uluslararası (90xxx); wa.me uluslararası ister.
+    const waDigits = (whatsappLink || "").replace(/[^0-9]/g, "")
+    const waIntl = waDigits.startsWith("0") ? `90${waDigits.slice(1)}` : waDigits
     const waHref = whatsappLink
-        ? (whatsappLink.startsWith("http") ? whatsappLink : `https://wa.me/${whatsappLink.replace(/[^0-9]/g, "")}`)
+        ? (whatsappLink.startsWith("http") ? whatsappLink : (waIntl ? `https://wa.me/${waIntl}` : null))
         : null
     
     const [inputValue, setInputValue] = useState("")
