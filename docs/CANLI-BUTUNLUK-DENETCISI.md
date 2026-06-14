@@ -25,6 +25,7 @@ Canlı sistemin mimari değişmezlerini **deterministik** kontrol eder, sonucu *
 | `regions-configured` | Checkout için bölge var mı | FAIL |
 | `shipping-configured` | Kargo seçeneği var mı | WARN |
 | `ai-provider` | Ollama (`OLLAMA_API_URL`) yapılandırılmış mı | WARN |
+| `memory-archiver-health` | Değişmez hafıza sınırsız büyümüş mü (arşivleyici tıkanması); eşik `INTEGRITY_MEMORY_WARN_THRESHOLD` (varsayılan 50000) | WARN |
 
 ## Öz-onarım (self-healing) — altın kural
 Bir onarım **"düzeltildi" sayılması için, onarımdan SONRA kontrol yeniden çalıştırılıp GEÇMELİDİR.**

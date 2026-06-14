@@ -120,6 +120,32 @@ const aiProviderCheck: Check = {
     },
 }
 
+/**
+ * Hafıza arşivleyici sağlıklı mı — DEĞİŞMEZ hafıza sınırsız büyümemeli.
+ * Arşivleyici (ayna-memory-archiver job) tıkanırsa aktif kayıt sayısı sürekli artar;
+ * bu, sessiz bir kaynak sızıntısıdır. Eşik INTEGRITY_MEMORY_WARN_THRESHOLD ile ayarlanır.
+ */
+const memoryArchiverCheck: Check = {
+    id: "memory-archiver-health",
+    title: "Hafıza arşivleyici sağlıklı (sınırsız büyüme yok)",
+    async run({ container, env }) {
+        if (!container) return r(this.id, this.title, "SKIPPED", "container yok — kontrol atlandı.")
+        const threshold = Number(env.INTEGRITY_MEMORY_WARN_THRESHOLD) || 50000
+        try {
+            const ayna = container.resolve("ayna") as {
+                listAndCountMemoryInsights?: (f: Record<string, unknown>, c: Record<string, unknown>) => Promise<[unknown[], number]>
+            }
+            if (!ayna?.listAndCountMemoryInsights) return r(this.id, this.title, "SKIPPED", "ayna servisi/sayım metodu yok.")
+            const [, activeCount] = await ayna.listAndCountMemoryInsights({ is_archived: false }, { take: 1 })
+            return activeCount > threshold
+                ? r(this.id, this.title, "WARN", `${activeCount} aktif hafıza kaydı (eşik ${threshold}) — arşivleyici tıkanmış olabilir (ayna-memory-archiver job'ını kontrol et).`, { activeCount, threshold })
+                : r(this.id, this.title, "OK", `${activeCount} aktif hafıza kaydı (eşik ${threshold} altında).`, { activeCount, threshold })
+        } catch (e) {
+            return r(this.id, this.title, "SKIPPED", `Hafıza sayımı yapılamadı: ${msg(e)}`)
+        }
+    },
+}
+
 function msg(e: unknown): string {
     return e instanceof Error ? e.message : String(e)
 }
@@ -132,4 +158,5 @@ export const DEFAULT_CHECKS: Check[] = [
     regionsCheck,
     shippingCheck,
     aiProviderCheck,
+    memoryArchiverCheck,
 ]

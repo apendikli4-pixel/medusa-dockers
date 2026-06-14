@@ -77,4 +77,24 @@ describe("integrity/checks — gerçek davranış (mock servislerle)", () => {
         const warn = await runIntegrityChecks({ query: q([]), env, now: "t" }, DEFAULT_CHECKS.filter((c) => c.id === "tenants-present"))
         expect(warn.checks[0].status).toBe("WARN")
     })
+
+    it("memory-archiver-health: eşik altında OK, üstünde WARN, container yoksa SKIPPED", async () => {
+        const only = DEFAULT_CHECKS.filter((c) => c.id === "memory-archiver-health")
+        const containerWith = (count: number) => ({
+            resolve: () => ({ listAndCountMemoryInsights: async () => [[], count] as [unknown[], number] }),
+        })
+        const ok = await runIntegrityChecks({ query: null, env: {}, container: containerWith(10), now: "t" }, only)
+        expect(ok.checks[0].status).toBe("OK")
+        const warn = await runIntegrityChecks({ query: null, env: { INTEGRITY_MEMORY_WARN_THRESHOLD: "5" }, container: containerWith(10), now: "t" }, only)
+        expect(warn.checks[0].status).toBe("WARN")
+        const skipped = await runIntegrityChecks({ query: null, env: {}, now: "t" }, only)
+        expect(skipped.checks[0].status).toBe("SKIPPED")
+    })
+
+    it("memory-archiver-health: ayna sayım hata verirse SKIPPED (çökmez)", async () => {
+        const only = DEFAULT_CHECKS.filter((c) => c.id === "memory-archiver-health")
+        const badContainer = { resolve: () => ({ listAndCountMemoryInsights: async () => { throw new Error("db yok") } }) }
+        const v = await runIntegrityChecks({ query: null, env: {}, container: badContainer, now: "t" }, only)
+        expect(v.checks[0].status).toBe("SKIPPED")
+    })
 })
