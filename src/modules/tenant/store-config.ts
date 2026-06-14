@@ -60,6 +60,7 @@ export const StoreConfigSchema = z.object({
         templates: z.object({
             orderPlaced: z.string().optional(),
             orderShipped: z.string().optional(),
+            abandonedCart: z.string().optional(),
         }).optional(),
     }).optional(),
 
