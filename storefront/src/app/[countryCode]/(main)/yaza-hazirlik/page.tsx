@@ -14,10 +14,12 @@ export const metadata: Metadata = {
 export default async function SummerCampaignPage({ params }: { params: Promise<{ countryCode: string }> }) {
   const { countryCode } = await params;
 
-  // Çoklu mağaza: bu kampanya HAVUZ sektörüne özeldir. Pool dışı mağazalarda
-  // (örn. Vozol/vape) havuz içeriği görünmemeli → 404. (Sektör/StoreConfig deseni.)
+  // Çoklu mağaza: bu havuz kampanyası yalnızca havuz işi yapan mağazalarda görünür.
+  // Aqua Havuz'un sektörü "retail" (havuz ürünü satar), gelecekteki havuz mağazaları
+  // "pool" olabilir → ikisine de izin. Vozol (vape) gibi alakasız sektörlerde 404.
   const tenant = await retrieveCurrentTenant();
-  if ((tenant?.sector || "").toLowerCase() !== "pool") {
+  const sector = (tenant?.sector || "").toLowerCase();
+  if (!["pool", "retail"].includes(sector)) {
     notFound();
   }
   return (

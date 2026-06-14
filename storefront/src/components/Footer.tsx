@@ -70,6 +70,7 @@ export default async function Footer({ countryCode }: { countryCode: string }) {
                 { label: "Hakkımızda", href: `${base}/pages/hakkimizda` },
                 { label: "İletişim", href: `${base}/contact` },
                 { label: "Blog", href: `${base}/blog` },
+                { label: "Şeffaflık & Dürüstlük", href: `${base}/seffaflik` },
                 { label: "Sıkça Sorulan Sorular", href: `${base}/faq` },
             ]),
         },
