@@ -15,6 +15,7 @@
         "audit:seal": "node scripts/audit/seal.mjs",
         "audit:test": "jest --silent scripts/audit/__tests__",
         "audit:full": "node scripts/audit/invariant-lint.mjs --all && tsc --noEmit -p tsconfig.json && jest --silent",
+        "smoke": "node scripts/smoke-test.mjs",
         "prepare": "git config core.hooksPath .githooks || true"
     },
     "dependencies": {
