@@ -9,8 +9,24 @@ export interface InjectionDetectionResult {
     detectedPatterns: string[];
 }
 
+// Görünmez / zero-width karakterler (bypass için araya serpiştirilebilir): ZWSP, ZWNJ, ZWJ,
+// BOM/ZWNBSP, word-joiner, soft-hyphen. Kaynak kodda literal yazmamak için kod noktasıyla tutulur.
+const INVISIBLE_CODE_POINTS = new Set<number>([0x200b, 0x200c, 0x200d, 0xfeff, 0x2060, 0x00ad]);
+
+function stripInvisible(input: string): string {
+    let out = "";
+    for (const ch of input) {
+        const cp = ch.codePointAt(0);
+        if (cp !== undefined && !INVISIBLE_CODE_POINTS.has(cp)) out += ch;
+    }
+    return out;
+}
+
 export function detectInjection(input: string): InjectionDetectionResult {
-    const lowerInput = input.toLowerCase();
+    // Normalizasyon: görünmez/zero-width karakterleri sil + Unicode NFKC.
+    // "sy<zwsp>stem" gibi zero-width veya fullwidth/homoglyph bypass denemelerini kapatır.
+    const normalized = stripInvisible(input).normalize("NFKC");
+    const lowerInput = normalized.toLowerCase();
     const detectedPatterns: string[] = [];
     let riskScore = 0;
 
@@ -36,6 +52,12 @@ export function detectInjection(input: string): InjectionDetectionResult {
         { regex: /jailbreak/i, weight: 20, description: "jailbreak" },
         { regex: /do\s+anything\s+now/i, weight: 20, description: "do anything now" },
         { regex: /dan\s+mode/i, weight: 20, description: "DAN mode" },
+
+        // ─── Türkçe enjeksiyon kalıpları (uygulama Türkçe; İngilizce-only tespiti bypass edilebilirdi) ───
+        { regex: /(önceki|tüm|bütün)\s+talimatlar[ıi].{0,15}(yoksay|unut|sil|görmezden|dikkate\s+alma)/i, weight: 25, description: "TR: talimatları yoksay" },
+        { regex: /sistem\s*(prompt|komut|talimat|yöner)/i, weight: 20, description: "TR: sistem prompt/komut" },
+        { regex: /(sen\s+art[ıi]k|bundan\s+sonra\s+sen)\s+/i, weight: 15, description: "TR: sen artık (rol değişimi)" },
+        { regex: /(rolünü|kimliğini|kurallarını)\s+(unut|değiştir|yoksay)/i, weight: 20, description: "TR: kurallarını değiştir" },
 
         // SQL injection
         { regex: /('|")?\s*(union|select|insert|update|delete|drop|create)\s+/i, weight: 15, description: "SQL injection" },
