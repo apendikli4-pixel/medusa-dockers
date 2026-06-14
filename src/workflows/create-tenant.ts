@@ -287,6 +287,20 @@ const createTenantAdminStep = createStep(
 
         logger.info(`[Provisioning] Admin user oluşturuldu: ${user.id} (${input.email})`)
 
+        // ─── 3. Parolayı DOĞRU (hash'li) ayarla + auth↔user bağı ───
+        // createAuthIdentities parolayı HAM saklar → login "Invalid key". updateProvider scrypt ile
+        // hash'ler (reset-admin-password ile aynı, kanıtlı). Ayrıca app_metadata.user_id olmadan
+        // login user actor'ünü çözemez → admin paneline giremez.
+        await authModuleService.updateProvider("emailpass", {
+            entity_id: input.email,
+            password: input.password,
+        })
+        await authModuleService.updateAuthIdentities([{
+            id: authIdentity.id,
+            app_metadata: { user_id: user.id },
+        }])
+        logger.info(`[Provisioning] Parola hash'lendi + auth↔user bağlandı (${user.id})`)
+
         // Compensation verisi: her iki ID de gerekli
         return new StepResponse(user, {
             user_id: user.id,
