@@ -1,6 +1,7 @@
 import type { MedusaContainer } from "@medusajs/framework/types"
 import { runIntegrityChecks, runSelfHeal } from "../lib/integrity/run"
 import type { CheckContext } from "../lib/integrity/run"
+import { pingMonitor } from "../lib/monitoring/heartbeat-ping"
 
 /**
  * KALP ATIŞI — Canlı Bütünlük Denetçisi (zamanlanmış, öz-onarımlı)
@@ -79,6 +80,11 @@ export default async function integrityHeartbeatJob(container: MedusaContainer):
     } else {
         logger.info(`[Heartbeat] ✓ ${verdict.summary}${healedIds.length ? ` (öz-onarım: ${healedIds.join(", ")})` : ""}`)
     }
+
+    // ─── DEAD MAN'S SWITCH ───
+    // Dış izleyiciye ping (HEARTBEAT_PING_URL). Ping kesilirse (sunucu/job ölürse) DIŞARIDAN
+    // uyarı gelir — in-app izleme sunucu düştüğünde kendisi de ölür. FAIL → /fail.
+    await pingMonitor(process.env.HEARTBEAT_PING_URL, verdict.overall !== "FAIL", logger)
 }
 
 export const config = {
