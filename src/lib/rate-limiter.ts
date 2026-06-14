@@ -6,6 +6,7 @@
 import { getRedisClient, initRedis } from "./redis/client";
 import type { RateLimitConfig } from "../config/rate-limits";
 import { ADMIN_WHITELIST_IPS, RATE_LIMIT_REDIS_PREFIX } from "../config/rate-limits";
+import { isIpAllowed } from "./ip-allowlist";
 import logger from "./logger";
 
 interface RateLimitLimiter {
@@ -61,49 +62,7 @@ function getClientIdentifier(req: any): string {
  * Checks if a given IP is in the admin whitelist
  */
 function isIpWhitelisted(ip: string): boolean {
-    if (ADMIN_WHITELIST_IPS.length === 0) {
-        return false;
-    }
-
-    for (const whitelistEntry of ADMIN_WHITELIST_IPS) {
-        // Exact IP match
-        if (whitelistEntry === ip) {
-            return true;
-        }
-
-        // CIDR range match (IPv4 only, simplified check)
-        if (whitelistEntry.includes("/")) {
-            const [rangeBase, prefixStr] = whitelistEntry.split("/");
-            const prefix = parseInt(prefixStr, 10);
-            if (!isNaN(prefix) && prefix >= 0 && prefix <= 32) {
-                const ipNum = ipToNumber(ip);
-                const rangeNum = ipToNumber(rangeBase);
-                if (ipNum !== null && rangeNum !== null) {
-                    const mask = ~((1 << (32 - prefix)) - 1);
-                    if ((ipNum & mask) === (rangeNum & mask)) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-
-    return false;
-}
-
-/**
- * Convert IPv4 address to 32-bit number
- */
-function ipToNumber(ip: string): number | null {
-    const parts = ip.split(".");
-    if (parts.length !== 4) {
-        return null;
-    }
-    const nums = parts.map((p) => parseInt(p, 10));
-    if (nums.some((n) => isNaN(n) || n < 0 || n > 255)) {
-        return null;
-    }
-    return (nums[0] << 24) + (nums[1] << 16) + (nums[2] << 8) + nums[3];
+    return isIpAllowed(ip, ADMIN_WHITELIST_IPS);
 }
 
 /**

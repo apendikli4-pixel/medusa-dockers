@@ -2,6 +2,7 @@
  * Rate Limit Configuration
  * Defines rate limiting policies for different API endpoints
  */
+import { parseIpList } from "../lib/ip-allowlist";
 
 export interface RateLimitConfig {
     /** Maximum number of requests allowed in the time window */
@@ -135,12 +136,7 @@ export const RATE_LIMITS = {
  * Format: comma-separated list of IP addresses or CIDR ranges
  * Example: "192.168.1.1,10.0.0.0/24,2001:db8::1"
  */
-export const ADMIN_WHITELIST_IPS = process.env.ADMIN_WHITELIST_IPS
-    ? process.env.ADMIN_WHITELIST_IPS
-          .split(",")
-          .map((ip) => ip.trim())
-          .filter((ip) => ip.length > 0)
-    : [];
+export const ADMIN_WHITELIST_IPS = parseIpList(process.env.ADMIN_WHITELIST_IPS);
 
 /**
  * Redis key prefix for rate limit entries
