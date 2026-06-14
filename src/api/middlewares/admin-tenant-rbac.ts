@@ -63,8 +63,12 @@ export const adminTenantRbac = async (
         }
     } catch (error: any) {
         logger.error(`[AdminRBAC] Rol denetimi sırasında hata: ${error.message}`)
-        // Güvenlik: Hata durumunda fail-closed olmak daha iyidir, ancak Medusa core adminlerini
-        // de kilitleriz diye şimdilik devam ediyoruz. Gerçek prod ortamında 403 dönülebilir.
+        // FAIL-CLOSED: tenant kapsamı BELİRLENEMEDİ. Devam etmek (fail-open), mağaza sahibi
+        // admininin sales_channel filtresi olmadan TÜM mağazaların verisine erişmesi demektir
+        // (cross-tenant sızıntı). Çok-tenant SaaS'ta izolasyon, geçici erişilebilirlikten önceliklidir.
+        // Normal işleyişte sistem-admin sorgusu BOŞ döner (hata değil) → global erişim korunur;
+        // buraya yalnızca gerçek bir altyapı hatasında düşülür ve sessiz sızıntıdansa görünür red yeğdir.
+        return res.status(503).json({ error: "Mağaza yetki denetimi şu an yapılamıyor, lütfen tekrar deneyin." })
     }
 
     return next()

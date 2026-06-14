@@ -280,7 +280,16 @@ Yeni bir modül/dosya mühürleneceğinde aşağıdaki bilgileri ekleyin:
 
 ## 🔄 Son Güncelleme
 
-- **Tarih:** 2026-05-14
+- **Tarih:** 2026-06-14
+- **Güncelleyen:** Mimari Sertleştirme (güvenlik denetimi)
+- **Değişiklikler:**
+  - **DÜRÜSTLÜK DÜZELTMESİ:** `tenant-isolation-filter.ts` — global filter'ın aslında hiçbir
+    yerde aktive EDİLMEDİĞİ açıkça belgelendi. Aktif izolasyon TEK katmandır: PostgreSQL RLS.
+    "İkili savunma" bir hedeftir, mevcut gerçek değildir. Mühür hash'i yenilendi (audit:seal).
+  - Tenant izolasyon sızıntıları kapatıldı (store route'larda zorunlu sales_channel_id) +
+    yeni önleyici audit kuralı `store-tenant-scope`.
+
+- **Önceki Tarih:** 2026-05-14
 - **Güncelleyen:** Core Team
 - **Değişiklikler:** 
   - Multi-Tenant modülü eklendi ve mühürlendi

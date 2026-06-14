@@ -15,10 +15,21 @@
  *   - RLS politikası app.current_tenant_id'yi boş string olarak görür
  *   - Sonuç: Hiçbir satır döndürülmez → Veri kaybı illüzyonu
  *
- * Global Filter bu açığı kapatır:
+ * Global Filter (TASARIM AMACI) bu açığı kapatabilir:
  *   - ORM seviyesinde otomatik WHERE tenant_id = :tenantId enjekte eder
  *   - Transaction olsun veya olmasın her sorguda çalışır
- *   - RLS + Global Filter = İkili savunma hattı (Defense in Depth)
+ *
+ * ─── ⚠️ MEVCUT DURUM (DÜRÜSTLÜK NOTU) ───
+ *
+ * Bu filter `false` (DEFAULT DISABLED) kaydedilir ve şu an HİÇBİR yerde aktive
+ * EDİLMEMEKTEDİR (kod tabanında `em.setFilterParams`/`setFilterEnabled` çağrısı yoktur).
+ * Dolayısıyla AKTİF tenant izolasyonu TEK katmandır: PostgreSQL RLS (DB seviyesi).
+ * "İkili savunma (Defense in Depth)" bir HEDEFTİR, şu an gerçek değildir — bu yorum,
+ * birinin filtreyi gerçekten aktive ettiğini SANMAMASI için açıkça belirtir.
+ * Ayrıca bu filter yalnızca `Tenant` entity'sine uygulanır (aşağıdaki KAPSAM); Tenant
+ * tablosu zaten RLS ile korunduğundan filtrenin marjinal değeri düşüktür.
+ * Çekirdek entity'lerin (Order/Product/Customer) izolasyonu için bkz. KAPSAM + store route
+ * sorgularında zorunlu sales_channel_id (audit kuralı: store-tenant-scope).
  *
  * ─── DİNAMİK PARAMETRE ───
  *
