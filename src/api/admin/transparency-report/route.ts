@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
 import { getCircuitBreaker } from "../../../lib/circuit-breaker"
+import { summarizeConscience, countAction } from "./metrics"
 
 /**
  * [GET] /admin/transparency-report
@@ -12,9 +13,11 @@ import { getCircuitBreaker } from "../../../lib/circuit-breaker"
  * canlı veritabanı/çalışma-anı kaynaklarından okunur; kaynak boşsa 0 döner (gizlemez).
  *
  * Kaynaklar (hepsi gerçek):
- *  - conscience_log: AI etik filtresinin verdiği gerçek kararlar (DENY=critical / ALLOW=info)
- *  - memory_truth:   AI'ın kaydettiği gerçek eylemler; metadata.action="product_search"
- *                    => yanıtın gerçek ürün verisine BAĞLANDIĞI (uydurulmadığı) kayıt
+ *  - memory_truth:   TEK DOĞRULUK KAYNAĞI. AI'ın gerçek eylemleri + etik verdict'leri
+ *                    (metadata.action="conscience_deny"/"conscience_allow"); ayrıca
+ *                    "product_search" => yanıtın gerçek ürün verisine BAĞLANDIĞI kayıt.
+ *  - conscience_log: YALNIZCA prompt-injection blokları (level="critical"); bunlar da
+ *                    "engellenen eylem" sayıldığından blockedActions'a katılır.
  *  - circuit-breaker: Ollama AI motorunun gerçek erişilebilirlik/hata metrikleri
  *
  * NOT: Rapor şimdilik global (tüm mağazalar). Admin JWT zorunlu (middlewares.ts).
@@ -48,16 +51,18 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         }
     }
 
-    // ── 1) Vicdan (conscience) — gerçek etik kararlar ──
+    // ── 1) Kaynakları çek ──
+    // conscience_log: yalnızca prompt-injection blokları (level="critical").
     const conscience = await fetchSince("conscience_log", ["id", "level", "created_at"])
-    const blockedActions = conscience.rows.filter((r: any) => r.level === "critical").length
-    const allowedActions = conscience.rows.filter((r: any) => r.level === "info").length
-
-    // ── 2) Dürüstlük kayıtları (memory_truth) — AI'ın gerçek eylemleri ──
+    // memory_truth: AI'ın gerçek eylemleri + etik verdict'leri (tek doğruluk kaynağı).
     const truth = await fetchSince("memory_truth", ["id", "metadata", "created_at"])
-    const actionOf = (r: any) => (r?.metadata?.action as string) || ""
-    const groundedProductAnswers = truth.rows.filter((r: any) => actionOf(r) === "product_search").length
-    const denyTruthRecords = truth.rows.filter((r: any) => actionOf(r) === "conscience_deny").length
+
+    // ── 2) Vicdan (etik filtre) — verdict'ler memory_truth'tan, injection conscience_log'tan ──
+    const consc = summarizeConscience(truth.rows, conscience.rows)
+
+    // ── 3) Dürüstlük / gerçeğe bağlılık (memory_truth) ──
+    const groundedProductAnswers = countAction(truth.rows, "product_search")
+    const denyTruthRecords = consc.aiDenies
 
     // ── 3) Ollama AI motoru — gerçek dayanıklılık metrikleri (circuit breaker) ──
     let ollama: any = { available: null, state: null, totalRequests: 0, successCount: 0, failureCount: 0, availabilityPct: null }
@@ -85,11 +90,15 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
             windowStart,
             // Her sayı GERÇEK kaynaktan; uydurma yok. Kaynak okunamazsa ok:false ile işaretli.
             conscience: {
-                totalVerdicts: conscience.rows.length,
-                blockedActions,   // AI'ın etik/güvenlik gerekçesiyle ENGELLEDİĞİ eylemler (DENY)
-                allowedActions,
-                sourceOk: conscience.ok,
-                truncated: conscience.truncated,
+                totalVerdicts: consc.totalVerdicts,
+                blockedActions: consc.blockedActions, // AI DENY + injection blokları (güvenlik gerekçesiyle engellenen)
+                allowedActions: consc.allowedActions, // AI ALLOW
+                // Şeffaflık için kırılım: kaynak ayrımı görünür kalsın
+                aiDenies: consc.aiDenies,
+                aiAllows: consc.aiAllows,
+                injectionBlocks: consc.injectionBlocks,
+                sourceOk: truth.ok && conscience.ok,
+                truncated: truth.truncated || conscience.truncated,
             },
             honesty: {
                 totalTruthRecords: truth.rows.length,
