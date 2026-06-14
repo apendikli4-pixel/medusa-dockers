@@ -41,6 +41,18 @@ const TransparencyReportPage = () => {
     const h = report?.honesty
     const ai = report?.aiEngine
 
+    // Circuit-breaker durumunu kullanıcı-dostu Türkçe etikete çevir.
+    // (Ham "CLOSED" terimi "port kapalı/erişilemez" gibi yanlış okunuyordu;
+    //  oysa CB dilinde CLOSED = sağlıklı/akış var.)
+    const stateLabel = (state?: string) => {
+        switch (state) {
+            case "CLOSED": return "ÇEVRİMİÇİ"
+            case "OPEN": return "ÇEVRİMDIŞI"
+            case "HALF_OPEN": return "TOPARLANIYOR"
+            default: return "—"
+        }
+    }
+
     return (
         <Container className="p-0">
             <div className="flex items-center justify-between px-6 py-4 border-b border-ui-border-base">
@@ -113,9 +125,9 @@ const TransparencyReportPage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <Stat
                                 label="Durum"
-                                value={ai?.state ?? "—"}
+                                value={stateLabel(ai?.state)}
                                 tone={ai?.available ? "ok" : ai?.state ? "danger" : "base"}
-                                hint={ai?.available === null ? "henüz veri yok" : ai?.available ? "erişilebilir" : "devre açık"}
+                                hint={ai?.available === null ? "henüz veri yok" : ai?.available ? "erişilebilir (akış normal)" : "devre açık (erişilemiyor)"}
                             />
                             <Stat label="Uptime" value={ai?.availabilityPct === null || ai?.availabilityPct === undefined ? "—" : `%${ai.availabilityPct}`}
                                 hint="başarılı / toplam istek" />

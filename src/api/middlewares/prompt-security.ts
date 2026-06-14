@@ -16,6 +16,10 @@
 import type { MedusaNextFunction, MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { detectInjection } from "../../modules/conscience/services/injection-detector.patterns"
 
+// conscience modül anahtarı (= CONSCIENCE_MODULE). Modül index'ini import etmiyoruz:
+// index `Module()` yan etkisi içerir ve test/derleme ortamını gereksiz yükler.
+const CONSCIENCE_MODULE = "conscience"
+
 const MAX_FIELD_LEN = 4096
 const BLOCK_THRESHOLD = 70
 const WARN_THRESHOLD = 40
@@ -78,6 +82,35 @@ export const promptSecurityMiddleware = async (
             riskScore: maxRisk,
             patterns: allPatterns,
         })
+
+        // ── GÖZLEMLENEBİLİRLİK: engellenen saldırıyı conscience_log'a (DENY) yaz ──
+        // Şeffaflık/Gözlem ekranları conscience_log'tan beslenir; bu kayıt olmadan
+        // "Engellenen Eylem" metriği gerçek saldırılar engellense bile 0 kalır.
+        // Best-effort: yazım başarısız olursa blok yanıtını ASLA engellemez.
+        try {
+            const conscience = req.scope.resolve(CONSCIENCE_MODULE) as
+                | { createConscienceLogs?: (data: any) => Promise<any> }
+                | undefined
+            const actorId = (req as any).auth_context?.actor_id
+            if (conscience?.createConscienceLogs) {
+                await conscience.createConscienceLogs([
+                    {
+                        customer_id: actorId || "anonymous",
+                        level: "critical",
+                        message: `Prompt injection engellendi (alan: ${blockedField}).`,
+                        metadata: {
+                            type: "INJECTION_BLOCKED",
+                            riskScore: maxRisk,
+                            patterns: allPatterns,
+                            path: req.path,
+                        },
+                    },
+                ])
+            }
+        } catch (e) {
+            logger.warn("[PromptSecurity] conscience_log yazılamadı", e)
+        }
+
         res.status(400).json({
             error: "PROMPT_INJECTION_DETECTED",
             message: "Girdi güvenlik denetiminden geçemedi.",
