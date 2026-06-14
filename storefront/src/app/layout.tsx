@@ -158,7 +158,12 @@ export default async function RootLayout({
             <body className="min-h-full flex flex-col bg-gray-50/50">
                 <main className="flex-grow relative z-10">{children}</main>
                 {/* Chat karşılaması: mağaza config'i → sektör preset'i → nötr (hook içinde). */}
-                <ChatWidget greeting={tenant?.storefront?.ai?.greeting || getSectorTexts(tenant?.sector).aiGreeting} />
+                {/* AI aç/kapa: kapalıysa widget WhatsApp'a yönlendirir (admin'den yönetilir). */}
+                <ChatWidget
+                    greeting={tenant?.storefront?.ai?.greeting || getSectorTexts(tenant?.sector).aiGreeting}
+                    aiChatEnabled={tenant?.storefront?.ai?.chatEnabled !== false}
+                    whatsappLink={tenant?.storefront?.ai?.whatsappLink || null}
+                />
             </body>
         </html>
     )

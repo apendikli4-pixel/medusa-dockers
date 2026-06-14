@@ -14,16 +14,30 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
-export default function ChatWidget({ greeting }: { greeting?: string }) {
-    const { 
-        messages, 
-        isLoading, 
-        isOpen, 
-        toggleChat, 
-        sendMessage, 
+export default function ChatWidget({
+    greeting,
+    aiChatEnabled = true,
+    whatsappLink = null,
+}: {
+    greeting?: string
+    aiChatEnabled?: boolean
+    whatsappLink?: string | null
+}) {
+    const {
+        messages,
+        isLoading,
+        isOpen,
+        toggleChat,
+        sendMessage,
         clearHistory,
-        messagesEndRef 
+        messagesEndRef
     } = useAynaChat(greeting)
+
+    // AI kapalı → müşteri WhatsApp'a yönlendirilir (admin'den yönetilir).
+    const aiOff = aiChatEnabled === false
+    const waHref = whatsappLink
+        ? (whatsappLink.startsWith("http") ? whatsappLink : `https://wa.me/${whatsappLink.replace(/[^0-9]/g, "")}`)
+        : null
     
     const [inputValue, setInputValue] = useState("")
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -209,7 +223,24 @@ export default function ChatWidget({ greeting }: { greeting?: string }) {
                             <div ref={messagesEndRef} className="h-1" />
                         </div>
 
-                        {/* Input Area */}
+                        {/* Input Area — AI KAPALIYSA WhatsApp CTA, AÇIKSA normal sohbet girişi */}
+                        {aiOff ? (
+                            <div className="p-4 bg-white/60 backdrop-blur-xl border-t border-white/50 relative z-10 text-center space-y-3">
+                                <p className="text-sm text-gray-600">Asistanımız şu an <span className="font-semibold text-green-600">WhatsApp</span> üzerinden yanıt veriyor.</p>
+                                {waHref ? (
+                                    <a
+                                        href={waHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center w-full bg-green-500 hover:bg-green-600 text-white rounded-full py-3.5 font-semibold shadow-md transition-all"
+                                    >
+                                        WhatsApp'tan Bize Yazın
+                                    </a>
+                                ) : (
+                                    <p className="text-xs text-gray-400">İletişim bilgisi henüz tanımlanmamış.</p>
+                                )}
+                            </div>
+                        ) : (
                         <div className="p-4 bg-white/60 backdrop-blur-xl border-t border-white/50 relative z-10">
                             {selectedImage && (
                                 <div className="mb-3 relative inline-block animate-fade-in-up">
@@ -267,6 +298,7 @@ export default function ChatWidget({ greeting }: { greeting?: string }) {
                                 <span className="text-[0.65rem] text-gray-500 font-medium tracking-widest uppercase">Ayna Genesis AI</span>
                             </div>
                         </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -32,6 +32,8 @@ const StorefrontSettingsPage = () => {
     const [brandDescription, setBrandDescription] = useState("")
     const [brandKeywords, setBrandKeywords] = useState("") // virgülle ayrılmış
     const [aiGreeting, setAiGreeting] = useState("")
+    const [aiChatEnabled, setAiChatEnabled] = useState(true)
+    const [whatsappLink, setWhatsappLink] = useState("")
     const [ageGateEnabled, setAgeGateEnabled] = useState(false)
     const [ageGateMessage, setAgeGateMessage] = useState("")
     const [emailSenderName, setEmailSenderName] = useState("")
@@ -83,6 +85,8 @@ const StorefrontSettingsPage = () => {
             setBrandDescription(sf.branding?.description || "")
             setBrandKeywords((sf.branding?.keywords || []).join(", "))
             setAiGreeting(sf.ai?.greeting || "")
+            setAiChatEnabled(sf.ai?.chatEnabled !== false)
+            setWhatsappLink(sf.ai?.whatsappLink || "")
             setAgeGateEnabled(!!sf.ageGate?.enabled)
             setAgeGateMessage(sf.ageGate?.message || "")
             setEmailSenderName(sf.email?.senderName || "")
@@ -153,6 +157,8 @@ const StorefrontSettingsPage = () => {
                 ai: {
                     ...(currentSf.ai || {}),
                     greeting: aiGreeting,
+                    chatEnabled: aiChatEnabled,
+                    whatsappLink: whatsappLink,
                 },
                 ageGate: {
                     ...(currentSf.ageGate || {}),
@@ -323,6 +329,18 @@ const StorefrontSettingsPage = () => {
                                 <Label>Karşılama Mesajı</Label>
                                 <Textarea rows={3} value={aiGreeting} onChange={e => setAiGreeting(e.target.value)} placeholder="Örn: Merhaba! Ben Ayna. Size nasıl yardımcı olabilirim?" />
                                 <Text className="text-ui-fg-muted text-xs">Boş bırakılırsa sektöre uygun varsayılan karşılama kullanılır.</Text>
+                            </div>
+
+                            {/* AI Sohbet Aç/Kapa — kapalıyken müşteriler WhatsApp'a yönlendirilir */}
+                            <div className="flex items-center gap-2 pt-2 border-t">
+                                <input type="checkbox" checked={aiChatEnabled} onChange={e => setAiChatEnabled(e.target.checked)} />
+                                <Label>AI Sohbeti Aktif</Label>
+                            </div>
+                            <Text className="text-ui-fg-muted text-xs">Kapatırsanız vitrindeki sohbet kutusu AI yerine WhatsApp'a yönlendirir.</Text>
+                            <div className="flex flex-col gap-2">
+                                <Label>WhatsApp Numarası / Linki</Label>
+                                <Input value={whatsappLink} onChange={e => setWhatsappLink(e.target.value)} placeholder="Örn: 905551234567 veya https://wa.me/905551234567" />
+                                <Text className="text-ui-fg-muted text-xs">AI sohbeti kapalıyken müşteriler bu numaraya yönlendirilir.</Text>
                             </div>
                         </div>
 

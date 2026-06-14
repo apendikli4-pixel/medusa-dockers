@@ -89,7 +89,12 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
                 heroImage: storefront.heroImage ?? null,
                 branding: storefront.branding ?? null,
                 seo: storefront.seo ?? null,
-                ai: storefront.ai ? { greeting: storefront.ai.greeting ?? null } : null,
+                ai: storefront.ai ? {
+                    greeting: storefront.ai.greeting ?? null,
+                    // chatEnabled undefined → AÇIK (varsayılan). Yalnızca açıkça false ise kapalı.
+                    chatEnabled: storefront.ai.chatEnabled !== false,
+                    whatsappLink: storefront.ai.whatsappLink ?? null,
+                } : { greeting: null, chatEnabled: true, whatsappLink: null },
                 ageGate: storefront.ageGate ?? null,
                 commerce: storefront.commerce ?? null,
                 footer: storefront.footer ?? null,

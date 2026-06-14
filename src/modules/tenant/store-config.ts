@@ -43,6 +43,10 @@ export const StoreConfigSchema = z.object({
     ai: z.object({
         greeting: z.string().optional(),
         contentPersona: z.string().optional(),
+        /** Vitrin AI sohbeti aktif mi (admin aç/kapa). undefined/true → açık. */
+        chatEnabled: z.boolean().optional(),
+        /** AI kapalıyken müşterinin yönlendirileceği WhatsApp numarası/linki. */
+        whatsappLink: z.string().optional(),
     }).optional(),
 
     /** 18+ yaş kapısı — sektör hardcode'u yerine config. */

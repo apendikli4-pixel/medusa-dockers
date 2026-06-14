@@ -32,6 +32,8 @@ export type StoreConfig = {
     }
     ai?: {
         greeting?: string
+        chatEnabled?: boolean
+        whatsappLink?: string | null
     }
     ageGate?: {
         enabled?: boolean
