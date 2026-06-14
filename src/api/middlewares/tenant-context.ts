@@ -120,7 +120,6 @@ const TENANT_EXEMPT_PATHS: readonly string[] = [
     "/ready",
     "/favicon.ico",
     "/store/auth",      // Kimlik doğrulama akışı — tenant bağlamı gerektirmez
-    "/store/signup",    // Self-servis mağaza kaydı — henüz tenant YOK (tenant'ı bu uç oluşturur)
     "/admin/auth",      // Admin kimlik doğrulama akışı
     "/admin/tenants",   // Tenant CRUD — kendi kendini yönetim (super-admin)
     "/admin/setup",     // İlk kurulum endpoint'i

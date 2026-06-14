@@ -1,21 +1,22 @@
 /**
- * POST /store/signup — Self-Servis Mağaza Kaydı (SaaS onboarding)
- * ═══════════════════════════════════════════════════════════════
+ * POST /signup — Self-Servis Mağaza Kaydı (SaaS onboarding)
+ * ═════════════════════════════════════════════════════════
  * Bir aday mağaza açar: form → otomatik tenant provizyonu (mevcut create-tenant workflow:
  * tenant + Sales Channel + Stock Location + API Key + mağaza sahibi ADMIN hesabı) → hoş geldin
  * e-postası → admin paneline giriş. Faturalama v1'de elle (deneme/trial).
  *
- * GÜVENLİK: Public kaynak-oluşturan uç → KATI rate-limit (spam tenant önlemi). Tenant-context'ten
- * MUAF (henüz tenant yok — bkz. tenant-context.ts TENANT_EXEMPT_PATHS).
+ * NEDEN /store değil /signup: /store/* route'ları Medusa'nın publishable-key zorunluluğuna tabidir;
+ * yeni kaydolan mağazanın henüz key'i YOKTUR. /signup bu zorunluluktan ve tenant-context'ten muaftır.
+ * GÜVENLİK: Public + kaynak yaratan uç → KATI rate-limit (spam tenant önlemi).
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
 import { Modules } from "@medusajs/framework/utils"
 import type { INotificationModuleService } from "@medusajs/framework/types"
-import { VALID_SECTORS } from "../../../modules/tenant/service"
-import { createTenantProvisioningWorkflow } from "../../../workflows/create-tenant"
-import { slugify, isValidSlug } from "../../../lib/signup/slug"
-import { createRateLimiter, applyRateLimit } from "../../../lib/rate-limiter"
+import { VALID_SECTORS } from "../../modules/tenant/service"
+import { createTenantProvisioningWorkflow } from "../../workflows/create-tenant"
+import { slugify, isValidSlug } from "../../lib/signup/slug"
+import { createRateLimiter, applyRateLimit } from "../../lib/rate-limiter"
 
 // Public + kaynak yaratan → saatte 5 deneme/IP (kötüye kullanım/spam tenant önlemi).
 const signupLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, maxRequests: 5 })
@@ -36,7 +37,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse): Promise<voi
     try {
         const data = SignupSchema.parse(req.body)
 
-        // Slug: verilmişse ondan, yoksa mağaza adından üret.
         const slug = data.slug?.trim() ? slugify(data.slug) : slugify(data.store_name)
         if (!isValidSlug(slug)) {
             res.status(400).json({ error: "Mağaza adından geçerli bir adres üretilemedi. Lütfen harf/rakam içeren bir ad girin." })
